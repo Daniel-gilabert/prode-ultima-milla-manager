@@ -1,0 +1,56 @@
+/* ======== Estilos PRODE Última Milla Manager ======== */
+
+/* Fondo general */
+body {
+    background-color: #f5f7fa;
+}
+
+/* Títulos corporativos */
+h1 {
+    color: #003366;
+    font-weight: 700;
+}
+
+h2, h3, h4 {
+    color: #0055a5;
+}
+
+/* Paneles de los expanders */
+.streamlit-expanderHeader {
+    background-color: #e6f0ff !important;
+    color: #003366 !important;
+    font-weight: 600;
+    border-radius: 4px;
+}
+
+/* Botones principales */
+.stButton>button {
+    background-color: #0055a5;
+    color: white;
+    border-radius: 6px;
+    padding: 8px 20px;
+    font-weight: 600;
+    border: none;
+}
+
+.stButton>button:hover {
+    background-color: #003d7a;
+    color: white;
+}
+
+/* Inputs */
+input, select, textarea {
+    border-radius: 6px !important;
+    border: 1px solid #a3bfe7 !important;
+}
+
+/* Barra lateral */
+.css-1d391kg {
+    background-color: #dce9ff !important;
+}
+
+/* Métricas bonitas */
+div[data-testid="stMetricValue"] {
+    color: #003366;
+    font-weight: bold;
+}
