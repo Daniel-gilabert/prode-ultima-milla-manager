@@ -3,7 +3,7 @@ import pandas as pd
 import os
 
 # -----------------------------------------
-# CONFIGURACIÓN DE LA APP
+# CONFIGURACIÓN GENERAL
 # -----------------------------------------
 st.set_page_config(
     page_title="PRODE Última Milla Manager",
@@ -12,10 +12,9 @@ st.set_page_config(
 )
 
 # -----------------------------------------
-# CARGA DE USUARIOS DESDE CSV
+# CARGA DE USUARIOS
 # -----------------------------------------
 def load_users():
-    """Carga el archivo de usuarios con codificación correcta."""
     try:
         return pd.read_csv("data/usuarios.csv", encoding="utf-8-sig")
     except:
@@ -27,7 +26,6 @@ def load_users():
 def validar_usuario(username, password):
     df = load_users()
 
-    # Asegurar que no haya espacios ocultos
     df["usuario"] = df["usuario"].astype(str).str.strip()
     df["contraseña"] = df["contraseña"].astype(str).str.strip()
 
@@ -37,6 +35,7 @@ def validar_usuario(username, password):
         if stored_pass == str(password):
             rol = user.iloc[0]["rol"]
             return True, rol
+
     return False, None
 
 # -----------------------------------------
@@ -51,6 +50,7 @@ def pantalla_login():
 
     if st.button("Entrar"):
         ok, rol = validar_usuario(username, password)
+
         if ok:
             st.session_state["login"] = True
             st.session_state["usuario"] = username
@@ -60,32 +60,30 @@ def pantalla_login():
             st.error("Usuario o contraseña incorrectos")
 
 # -----------------------------------------
-# MENÚ LATERAL Y NAVEGACIÓN
+# MENÚ ORDENADO SEGÚN TU LISTA (1–2–6–3–4–7–10–8–9)
 # -----------------------------------------
-def cargar_paginas():
-    """Carga automáticamente las páginas desde la carpeta pages."""
-    paginas = {}
-    base_dir = "pages"
-
-    if not os.path.exists(base_dir):
-        return paginas
-
-    for file in sorted(os.listdir(base_dir)):
-        if file.endswith(".py"):
-            nombre = file.replace(".py", "")
-            ruta = os.path.join(base_dir, file)
-            paginas[nombre] = ruta
-
-    return paginas
-
 def mostrar_paginas():
-    paginas = cargar_paginas()
-    
     st.sidebar.title("Menú")
-    seleccion = st.sidebar.radio("Ir a:", list(paginas.keys()))
 
-    # Ejecuta la página seleccionada
-    with open(paginas[seleccion], "r", encoding="utf-8") as f:
+    # ORDEN PERSONALIZADO EXACTO QUE PEDISTE
+    orden_menu = {
+        "9_Dashboard": "Dashboard",               # 1
+        "Empleados": "Empleados",                 # 2
+        "6_EPIs": "EPIs",                         # 6
+        "3_Servicios": "Servicios",               # 3
+        "4_Vehiculos": "Vehículos",               # 4
+        "8_Mantenimiento": "Mantenimiento",       # 7
+        "Documentacion": "Documentación",         # 10
+        "10_Papelera_Central": "Papelera Central",# 8
+        "99_Papelera": "Papelera",                # 9
+    }
+
+    seleccion = st.sidebar.radio("Ir a:", list(orden_menu.values()))
+
+    archivo = [k for k, v in orden_menu.items() if v == seleccion][0] + ".py"
+    ruta = os.path.join("pages", archivo)
+
+    with open(ruta, "r", encoding="utf-8") as f:
         code = f.read()
         exec(code, globals())
 
@@ -100,44 +98,9 @@ def mostrar_paginas():
 # -----------------------------------------
 # CONTROL PRINCIPAL
 # -----------------------------------------
-if "login" not in st.session_state or st.session_state["login"] is not True:
+if "login" not in st.session_state or st.session_state["login"] != True:
     pantalla_login()
 else:
     mostrar_paginas()
-def mostrar_paginas():
-    st.sidebar.title("Menú")
 
-    # ORDEN PERSONALIZADO (según tu lista 1 2 6 3 4 7 10 8 9)
-    orden_menu = {
-        "9_Dashboard": "Dashboard",               # 1
-        "Empleados": "Empleados",                 # 2
-        "6_EPIs": "EPIs",                         # 6
-        "3_Servicios": "Servicios",               # 3
-        "4_Vehiculos": "Vehículos",               # 4
-        "8_Mantenimiento": "Mantenimiento",       # 7
-        "Documentacion": "Documentación",         # 10
-        "10_Papelera_Central": "Papelera Central",# 8
-        "99_Papelera": "Papelera",                # 9
-    }
-
-    # Mostrar menú con el orden indicado
-    seleccion = st.sidebar.radio("Ir a:", list(orden_menu.values()))
-
-    # Obtener archivo correspondiente
-    archivo = [k for k, v in orden_menu.items() if v == seleccion][0] + ".py"
-    ruta = os.path.join("pages", archivo)
-
-    # Ejecutar la página seleccionada
-    with open(ruta, "r", encoding="utf-8") as f:
-        code = f.read()
-        exec(code, globals())
-
-    # Información del usuario
-    st.sidebar.write("---")
-    st.sidebar.write(f"Usuario: **{st.session_state['usuario']}**")
-    st.sidebar.write(f"Rol: **{st.session_state['rol']}**")
-
-    if st.sidebar.button("Cerrar sesión"):
-        st.session_state.clear()
-        st.rerun()
 
