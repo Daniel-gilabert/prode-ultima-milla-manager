@@ -1,10 +1,8 @@
 import streamlit as st
 import json
-import os
 from pathlib import Path
 
 DATA_PATH = Path("data/servicios.json")
-
 
 # ----------------------------
 # Funciones auxiliares
@@ -26,9 +24,58 @@ def save_data(data):
 
 
 def get_next_id(data):
-    if not data:
-        return 1
-    return max(item["id"] for item in data) + 1
+    return max([s["id"] for s in data], default=0) + 1
+
+
+# ----------------------------
+# Ficha Horizontal
+# ----------------------------
+
+def mostrar_ficha_servicio(servicio):
+    st.markdown("### 📝 Ficha del servicio")
+    st.write("---")
+
+    # --- FILA 1 ---
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.subheader("📦 Datos del servicio")
+        st.markdown(f"**ID:** {servicio['id']}")
+        st.markdown(f"**Nombre del servicio:** {servicio['nombre_servicio']}")
+        st.markdown(f"**Teléfono:** {servicio['telefono']}")
+
+    with col2:
+        st.subheader("🏢 Empresa")
+        st.markdown(f"**CIF:** {servicio['cif']}")
+        st.markdown(f"**Empresa:** {servicio['nombre_empresa']}")
+        st.markdown(f"**Correo:** {servicio['correo']}")
+
+    st.write("---")
+
+    # --- FILA 2 ---
+    st.subheader("📍 Dirección del servicio")
+    st.info(servicio["direccion"])
+
+    st.write("---")
+
+    # --- FILA 3 ---
+    col3, col4 = st.columns(2)
+
+    with col3:
+        st.subheader("👤 Persona de contacto")
+        st.markdown(f"**Nombre:** {servicio['persona_contacto']}")
+
+    with col4:
+        st.subheader("📞 Teléfono de contacto")
+        st.markdown(f"**Teléfono:** {servicio['telefono_contacto']}")
+
+    st.write("---")
+
+    # --- FILA 4 ---
+    st.subheader("🧾 Notas adicionales")
+    st.markdown(servicio["notas"] if servicio["notas"] else "_Sin notas_")
+
+    st.write("---")
 
 
 # ----------------------------
@@ -40,20 +87,22 @@ def app():
 
     servicios = load_data()
 
-    # Selección de servicio para editar
     st.subheader("🔧 Crear / Editar servicio")
 
-    nombres_servicios = ["Nuevo servicio"] + [f"{s['id']} - {s['nombre_servicio']}" for s in servicios]
+    nombres_servicios = ["Nuevo servicio"] + [
+        f"{s['id']} - {s['nombre_servicio']}" for s in servicios
+    ]
     seleccion = st.selectbox("Seleccionar servicio", nombres_servicios)
 
     if seleccion != "Nuevo servicio":
         servicio_id = int(seleccion.split(" - ")[0])
         servicio_actual = next((s for s in servicios if s["id"] == servicio_id), None)
+        mostrar_ficha_servicio(servicio_actual)
     else:
         servicio_actual = None
 
     # ----------------------------
-    # FORMULARIO CORRECTO
+    # FORMULARIO
     # ----------------------------
 
     with st.form("form_servicio"):
@@ -104,12 +153,13 @@ def app():
 
         submitted = st.form_submit_button("💾 Guardar servicio")
 
-    # FIN DEL FORMULARIO
-    # -----------------------------------
+    # ----------------------------
+    # Acción al guardar
+    # ----------------------------
 
     if submitted:
         if servicio_actual:
-            # Editar existente
+            # Editar
             servicio_actual.update({
                 "nombre_servicio": nombre_servicio,
                 "cif": cif,
@@ -122,7 +172,6 @@ def app():
                 "notas": notas
             })
             st.success("Servicio actualizado correctamente ✔️")
-
         else:
             # Crear nuevo
             nuevo_servicio = {
@@ -143,8 +192,9 @@ def app():
         save_data(servicios)
 
     # ----------------------------
-    # Mostrar tabla de servicios
+    # TABLA DE SERVICIOS
     # ----------------------------
+
     st.subheader("📋 Lista de servicios registrados")
     if servicios:
         st.dataframe(servicios, use_container_width=True)
@@ -152,7 +202,8 @@ def app():
         st.info("No hay servicios registrados todavía.")
 
 
-# Llamada necesaria para Streamlit multipage
+# Necesario para multipage en Streamlit
 if __name__ == "__main__":
     app()
+
 
