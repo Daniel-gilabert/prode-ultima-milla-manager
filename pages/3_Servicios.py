@@ -4,9 +4,9 @@ from pathlib import Path
 
 DATA_PATH = Path("data/servicios.json")
 
-# ----------------------------
+# ============================================
 # Funciones auxiliares
-# ----------------------------
+# ============================================
 
 def load_data():
     if not DATA_PATH.exists():
@@ -27,60 +27,93 @@ def get_next_id(data):
     return max([s["id"] for s in data], default=0) + 1
 
 
-# ----------------------------
-# Ficha Horizontal
-# ----------------------------
+# ============================================
+# TARJETAS DE DISEÑO
+# ============================================
+
+def tarjeta(title, icon, content):
+    st.markdown(
+        f"""
+        <div style="
+            background-color:#f5f5f5;
+            padding:15px;
+            border-radius:12px;
+            margin-bottom:10px;
+            border:1px solid #ddd;">
+            <h4 style="margin:0; padding:0; font-size:18px;">{icon} {title}</h4>
+            <div style="font-size:15px; margin-top:8px;">
+                {content}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 def mostrar_ficha_servicio(servicio):
-    st.markdown("### 📝 Ficha del servicio")
-    st.write("---")
 
-    # --- FILA 1 ---
+    st.markdown("### 📝 Ficha del servicio")
+    st.write("")
+
+    # -------- FILA 1: Datos de servicio + Empresa --------
     col1, col2 = st.columns(2)
 
     with col1:
-        st.subheader("📦 Datos del servicio")
-        st.markdown(f"**ID:** {servicio['id']}")
-        st.markdown(f"**Nombre del servicio:** {servicio['nombre_servicio']}")
-        st.markdown(f"**Teléfono:** {servicio['telefono']}")
+        tarjeta(
+            "Datos del servicio",
+            "📦",
+            f"""
+            <b>ID:</b> {servicio['id']}<br>
+            <b>Servicio:</b> {servicio['nombre_servicio']}<br>
+            <b>Teléfono:</b> {servicio['telefono']}
+            """
+        )
 
     with col2:
-        st.subheader("🏢 Empresa")
-        st.markdown(f"**CIF:** {servicio['cif']}")
-        st.markdown(f"**Empresa:** {servicio['nombre_empresa']}")
-        st.markdown(f"**Correo:** {servicio['correo']}")
+        tarjeta(
+            "Información de la empresa",
+            "🏢",
+            f"""
+            <b>CIF:</b> {servicio['cif']}<br>
+            <b>Empresa:</b> {servicio['nombre_empresa']}<br>
+            <b>Correo:</b> {servicio['correo']}
+            """
+        )
 
-    st.write("---")
+    # -------- FILA 2: Dirección --------
+    tarjeta(
+        "Dirección",
+        "📍",
+        servicio["direccion"]
+    )
 
-    # --- FILA 2 ---
-    st.subheader("📍 Dirección del servicio")
-    st.info(servicio["direccion"])
-
-    st.write("---")
-
-    # --- FILA 3 ---
+    # -------- FILA 3: Contacto --------
     col3, col4 = st.columns(2)
 
     with col3:
-        st.subheader("👤 Persona de contacto")
-        st.markdown(f"**Nombre:** {servicio['persona_contacto']}")
+        tarjeta(
+            "Persona de contacto",
+            "👤",
+            f"<b>{servicio['persona_contacto']}</b>"
+        )
 
     with col4:
-        st.subheader("📞 Teléfono de contacto")
-        st.markdown(f"**Teléfono:** {servicio['telefono_contacto']}")
+        tarjeta(
+            "Teléfono contacto",
+            "📞",
+            f"<b>{servicio['telefono_contacto']}</b>"
+        )
 
-    st.write("---")
+    # -------- FILA 4: Notas --------
+    tarjeta(
+        "Notas",
+        "🧾",
+        servicio["notas"] if servicio["notas"] else "Sin notas"
+    )
 
-    # --- FILA 4 ---
-    st.subheader("🧾 Notas adicionales")
-    st.markdown(servicio["notas"] if servicio["notas"] else "_Sin notas_")
 
-    st.write("---")
-
-
-# ----------------------------
-# Página de Servicios
-# ----------------------------
+# ============================================
+# PÁGINA PRINCIPAL DE SERVICIOS
+# ============================================
 
 def app():
     st.title("📦 Gestión de Servicios")
@@ -94,6 +127,7 @@ def app():
     ]
     seleccion = st.selectbox("Seleccionar servicio", nombres_servicios)
 
+    # Servicio seleccionado
     if seleccion != "Nuevo servicio":
         servicio_id = int(seleccion.split(" - ")[0])
         servicio_actual = next((s for s in servicios if s["id"] == servicio_id), None)
@@ -101,9 +135,9 @@ def app():
     else:
         servicio_actual = None
 
-    # ----------------------------
-    # FORMULARIO
-    # ----------------------------
+    # ============================================
+    # FORMULARIO DE CREAR / EDITAR
+    # ============================================
 
     with st.form("form_servicio"):
         nombre_servicio = st.text_input(
@@ -153,13 +187,12 @@ def app():
 
         submitted = st.form_submit_button("💾 Guardar servicio")
 
-    # ----------------------------
-    # Acción al guardar
-    # ----------------------------
+    # ============================================
+    # GUARDAR SERVICIO
+    # ============================================
 
     if submitted:
         if servicio_actual:
-            # Editar
             servicio_actual.update({
                 "nombre_servicio": nombre_servicio,
                 "cif": cif,
@@ -173,7 +206,6 @@ def app():
             })
             st.success("Servicio actualizado correctamente ✔️")
         else:
-            # Crear nuevo
             nuevo_servicio = {
                 "id": get_next_id(servicios),
                 "nombre_servicio": nombre_servicio,
@@ -191,9 +223,9 @@ def app():
 
         save_data(servicios)
 
-    # ----------------------------
+    # ============================================
     # TABLA DE SERVICIOS
-    # ----------------------------
+    # ============================================
 
     st.subheader("📋 Lista de servicios registrados")
     if servicios:
@@ -202,8 +234,9 @@ def app():
         st.info("No hay servicios registrados todavía.")
 
 
-# Necesario para multipage en Streamlit
+# Requerido por Streamlit multipage
 if __name__ == "__main__":
     app()
+
 
 
