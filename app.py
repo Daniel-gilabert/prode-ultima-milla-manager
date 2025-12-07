@@ -104,4 +104,40 @@ if "login" not in st.session_state or st.session_state["login"] is not True:
     pantalla_login()
 else:
     mostrar_paginas()
+def mostrar_paginas():
+    st.sidebar.title("Menú")
+
+    # ORDEN PERSONALIZADO (según tu lista 1 2 6 3 4 7 10 8 9)
+    orden_menu = {
+        "9_Dashboard": "Dashboard",               # 1
+        "Empleados": "Empleados",                 # 2
+        "6_EPIs": "EPIs",                         # 6
+        "3_Servicios": "Servicios",               # 3
+        "4_Vehiculos": "Vehículos",               # 4
+        "8_Mantenimiento": "Mantenimiento",       # 7
+        "Documentacion": "Documentación",         # 10
+        "10_Papelera_Central": "Papelera Central",# 8
+        "99_Papelera": "Papelera",                # 9
+    }
+
+    # Mostrar menú con el orden indicado
+    seleccion = st.sidebar.radio("Ir a:", list(orden_menu.values()))
+
+    # Obtener archivo correspondiente
+    archivo = [k for k, v in orden_menu.items() if v == seleccion][0] + ".py"
+    ruta = os.path.join("pages", archivo)
+
+    # Ejecutar la página seleccionada
+    with open(ruta, "r", encoding="utf-8") as f:
+        code = f.read()
+        exec(code, globals())
+
+    # Información del usuario
+    st.sidebar.write("---")
+    st.sidebar.write(f"Usuario: **{st.session_state['usuario']}**")
+    st.sidebar.write(f"Rol: **{st.session_state['rol']}**")
+
+    if st.sidebar.button("Cerrar sesión"):
+        st.session_state.clear()
+        st.rerun()
 
