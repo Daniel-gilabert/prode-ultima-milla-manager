@@ -41,15 +41,17 @@ if archivo is not None:
         # COLUMNAS OBLIGATORIAS
         # -----------------------------------------
         columnas_obligatorias = {
-            "id_empleado",
-            "nombre",
-            "dni",
-            "email",
-            "telefono",
-            "puesto",
-            "ubicacion",
-            "estado",
-        }
+    "id_empleado",
+    "nombre",
+    "dni",
+    "email",
+    "telefono",
+    "puesto",
+    "ubicacion",
+    "estado",
+    "url_foto",  
+}
+
 
         columnas_excel = set(df.columns)
 
