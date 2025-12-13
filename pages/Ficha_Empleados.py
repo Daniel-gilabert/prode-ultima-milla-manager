@@ -3,14 +3,10 @@ import pandas as pd
 from pathlib import Path
 
 # -----------------------------------------
-# CONFIGURACIÓN
+# CONFIGURACIÓN DE LA PÁGINA
 # -----------------------------------------
 st.set_page_config(layout="wide")
 st.title("Ficha de Empleado")
-st.info(
-    "Zona de consulta central. Desde aquí se accede a toda la información "
-    "relacionada con un empleado."
-)
 
 # -----------------------------------------
 # RUTAS
@@ -21,55 +17,45 @@ EMP_FILE = DATA / "empleados.csv"
 FOTOS_DIR = DATA / "fotos_empleados"
 
 # -----------------------------------------
-# CARGA DE EMPLEADOS
+# COMPROBACIONES
 # -----------------------------------------
 if not EMP_FILE.exists():
-    st.error("No hay empleados cargados todavía.")
+    st.error("No hay empleados cargados.")
     st.stop()
 
 df = pd.read_csv(EMP_FILE, encoding="utf-8-sig")
 
 if df.empty:
-    st.warning("El archivo de empleados está vacío.")
+    st.warning("No hay empleados para mostrar.")
     st.stop()
 
 # -----------------------------------------
 # BUSCADOR GLOBAL
 # -----------------------------------------
-st.subheader("Buscar empleado")
-
 busqueda = st.text_input(
-    "Busca por nombre, DNI, email, teléfono, puesto, ubicación, estado o ID",
-    placeholder="Escribe cualquier dato del empleado..."
+    "Buscar empleado (nombre, DNI, email, teléfono, puesto, ubicación...)"
 )
 
-df_busqueda = df.copy()
-
 if busqueda:
-    busqueda_lower = busqueda.lower()
-
-    df_busqueda = df[
+    busqueda = busqueda.lower()
+    df = df[
         df.astype(str)
-        .apply(lambda fila: fila.str.lower().str.contains(busqueda_lower))
+        .apply(lambda fila: fila.str.lower().str.contains(busqueda))
         .any(axis=1)
     ]
 
-if df_busqueda.empty:
-    st.warning("No se encontraron empleados con ese criterio.")
+if df.empty:
+    st.warning("No se encontró ningún empleado.")
     st.stop()
 
 # -----------------------------------------
-# SELECTOR DE EMPLEADO (FILTRADO)
+# SELECTOR DE EMPLEADO
 # -----------------------------------------
-df_busqueda["selector"] = (
-    df_busqueda["id_empleado"].astype(str)
-    + " - "
-    + df_busqueda["nombre"]
-)
+df["selector"] = df["id_empleado"].astype(str) + " - " + df["nombre"]
 
 empleado_sel = st.selectbox(
     "Selecciona un empleado",
-    df_busqueda["selector"].tolist()
+    df["selector"].tolist()
 )
 
 id_empleado = int(empleado_sel.split(" - ")[0])
@@ -78,20 +64,23 @@ emp = df[df["id_empleado"] == id_empleado].iloc[0]
 st.markdown("---")
 
 # -----------------------------------------
-# LAYOUT FICHA
+# LAYOUT EN COLUMNAS
 # -----------------------------------------
 col_foto, col_datos = st.columns([1, 2])
 
-# ---------- FOTO ----------
+# ---------- FOTO (TAMAÑO CONTROLADO) ----------
 with col_foto:
-    foto = FOTOS_DIR / f"{id_empleado}.jpg"
+    foto_jpg = FOTOS_DIR / f"{id_empleado}.jpg"
+    foto_png = FOTOS_DIR / f"{id_empleado}.png"
 
-    if foto.exists():
-        st.image(str(foto), use_container_width=True)
+    if foto_jpg.exists():
+        st.image(str(foto_jpg), width=220)
+    elif foto_png.exists():
+        st.image(str(foto_png), width=220)
     else:
-        st.info("Sin foto disponible")
+        st.info("Este empleado no tiene foto.")
 
-# ---------- DATOS ----------
+# ---------- DATOS DEL EMPLEADO ----------
 with col_datos:
     st.subheader(emp["nombre"])
 
@@ -106,22 +95,19 @@ with col_datos:
 st.markdown("---")
 
 # -----------------------------------------
-# ZONA CENTRAL DEL EMPLEADO (FUTURO)
+# ZONA CENTRAL (PARA CRECER)
 # -----------------------------------------
 st.header("Información relacionada")
 
 with st.expander("🚚 Vehículo asignado"):
-    st.info("Aquí se mostrará el vehículo del empleado.")
-
-with st.expander("📌 Servicios"):
-    st.info("Aquí se mostrarán los servicios relacionados.")
+    st.info("Pendiente de implementar")
 
 with st.expander("📦 EPIs"):
-    st.info("Aquí se mostrarán los EPIs entregados.")
+    st.info("Pendiente de implementar")
+
+with st.expander("📌 Servicios"):
+    st.info("Pendiente de implementar")
 
 with st.expander("📄 Documentación"):
-    st.info("Aquí se mostrará la documentación del empleado.")
-
-
-
+    st.info("Pendiente de implementar")
 
