@@ -62,9 +62,9 @@ max_idx = len(df_filtrado) - 1
 st.session_state.idx_emp = max(0, min(st.session_state.idx_emp, max_idx))
 
 # -----------------------------------------
-# BOTONES DE NAVEGACIÓN (DERECHA, COMPACTOS)
+# BOTONES DE NAVEGACIÓN (ULTRA COMPACTOS, DERECHA)
 # -----------------------------------------
-_, _, _, c1, c2, c3, c4 = st.columns([6, 1, 1, 1, 1, 1, 1])
+espacio, c1, c2, c3, c4 = st.columns([12, 0.6, 0.6, 0.6, 0.6])
 
 with c1:
     if st.button("⏮", help="Primero"):
@@ -138,5 +138,6 @@ with st.expander("📌 Servicios"):
 
 with st.expander("📄 Documentación"):
     st.info("Pendiente de implementar")
+
 
 
