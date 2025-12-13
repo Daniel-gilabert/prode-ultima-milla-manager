@@ -62,29 +62,28 @@ max_idx = len(df_filtrado) - 1
 st.session_state.idx_emp = max(0, min(st.session_state.idx_emp, max_idx))
 
 # -----------------------------------------
-# BOTONES DE NAVEGACIÓN
+# BOTONES DE NAVEGACIÓN (DERECHA, COMPACTOS)
 # -----------------------------------------
-c1, c2, c3, c4 = st.columns(4)
+_, _, _, c1, c2, c3, c4 = st.columns([6, 1, 1, 1, 1, 1, 1])
 
 with c1:
-    if st.button("⏮ Primero"):
+    if st.button("⏮", help="Primero"):
         st.session_state.idx_emp = 0
 
 with c2:
-    if st.button("◀ Anterior"):
+    if st.button("◀", help="Anterior"):
         if st.session_state.idx_emp > 0:
             st.session_state.idx_emp -= 1
 
 with c3:
-    if st.button("Siguiente ▶"):
+    if st.button("▶", help="Siguiente"):
         if st.session_state.idx_emp < max_idx:
             st.session_state.idx_emp += 1
 
 with c4:
-    if st.button("Último ⏭"):
+    if st.button("⏭", help="Último"):
         st.session_state.idx_emp = max_idx
 
-st.markdown("---")
 
 # -----------------------------------------
 # EMPLEADO ACTUAL
@@ -139,4 +138,5 @@ with st.expander("📌 Servicios"):
 
 with st.expander("📄 Documentación"):
     st.info("Pendiente de implementar")
+
 
