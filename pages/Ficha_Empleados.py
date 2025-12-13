@@ -1,12 +1,9 @@
-
-
-
 import streamlit as st
 import pandas as pd
 from pathlib import Path
 
 # -----------------------------------------
-# CONFIGURACIÓN DE LA PÁGINA
+# CONFIGURACIÓN
 # -----------------------------------------
 st.set_page_config(layout="wide")
 st.title("Ficha de Empleado")
@@ -32,46 +29,75 @@ if df.empty:
     st.warning("No hay empleados para mostrar.")
     st.stop()
 
+df = df.sort_values("id_empleado").reset_index(drop=True)
+
 # -----------------------------------------
-# BUSCADOR GLOBAL
+# BUSCADOR
 # -----------------------------------------
 busqueda = st.text_input(
     "Buscar empleado (nombre, DNI, email, teléfono, puesto, ubicación...)"
 )
 
-if busqueda:
-    busqueda = busqueda.lower()
-    df = df[
-        df.astype(str)
-        .apply(lambda fila: fila.str.lower().str.contains(busqueda))
-        .any(axis=1)
-    ]
+df_filtrado = df.copy()
 
-if df.empty:
+if busqueda:
+    b = busqueda.lower()
+    df_filtrado = df[
+        df.astype(str)
+        .apply(lambda fila: fila.str.lower().str.contains(b))
+        .any(axis=1)
+    ].reset_index(drop=True)
+
+if df_filtrado.empty:
     st.warning("No se encontró ningún empleado.")
     st.stop()
 
 # -----------------------------------------
-# SELECTOR DE EMPLEADO
+# ESTADO DE NAVEGACIÓN
 # -----------------------------------------
-df["selector"] = df["id_empleado"].astype(str) + " - " + df["nombre"]
+if "idx_emp" not in st.session_state:
+    st.session_state.idx_emp = 0
 
-empleado_sel = st.selectbox(
-    "Selecciona un empleado",
-    df["selector"].tolist()
-)
+max_idx = len(df_filtrado) - 1
+st.session_state.idx_emp = max(0, min(st.session_state.idx_emp, max_idx))
 
-id_empleado = int(empleado_sel.split(" - ")[0])
-emp = df[df["id_empleado"] == id_empleado].iloc[0]
+# -----------------------------------------
+# BOTONES DE NAVEGACIÓN
+# -----------------------------------------
+c1, c2, c3, c4 = st.columns(4)
+
+with c1:
+    if st.button("⏮ Primero"):
+        st.session_state.idx_emp = 0
+
+with c2:
+    if st.button("◀ Anterior"):
+        if st.session_state.idx_emp > 0:
+            st.session_state.idx_emp -= 1
+
+with c3:
+    if st.button("Siguiente ▶"):
+        if st.session_state.idx_emp < max_idx:
+            st.session_state.idx_emp += 1
+
+with c4:
+    if st.button("Último ⏭"):
+        st.session_state.idx_emp = max_idx
 
 st.markdown("---")
 
 # -----------------------------------------
-# LAYOUT EN COLUMNAS
+# EMPLEADO ACTUAL
+# -----------------------------------------
+emp = df_filtrado.iloc[st.session_state.idx_emp]
+id_empleado = int(emp["id_empleado"])
+
+# -----------------------------------------
+# LAYOUT
 # -----------------------------------------
 col_foto, col_datos = st.columns([1, 3])
 
-# ---------- FOTO (MUY COMPACTA) ----------
+# ---------- FOTO ----------
 with col_foto:
     foto_jpg = FOTOS_DIR / f"{id_empleado}.jpg"
     foto_png = FOTOS_DIR / f"{id_empleado}.png"
@@ -83,7 +109,7 @@ with col_foto:
     else:
         st.info("Sin foto")
 
-# ---------- DATOS DEL EMPLEADO ----------
+# ---------- DATOS ----------
 with col_datos:
     st.subheader(emp["nombre"])
 
@@ -98,7 +124,7 @@ with col_datos:
 st.markdown("---")
 
 # -----------------------------------------
-# ZONA CENTRAL (PARA CRECER)
+# INFO RELACIONADA (FUTURO)
 # -----------------------------------------
 st.header("Información relacionada")
 
@@ -113,3 +139,4 @@ with st.expander("📌 Servicios"):
 
 with st.expander("📄 Documentación"):
     st.info("Pendiente de implementar")
+
