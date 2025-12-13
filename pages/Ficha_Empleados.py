@@ -1,3 +1,6 @@
+
+
+
 import streamlit as st
 import pandas as pd
 from pathlib import Path
@@ -66,19 +69,19 @@ st.markdown("---")
 # -----------------------------------------
 # LAYOUT EN COLUMNAS
 # -----------------------------------------
-col_foto, col_datos = st.columns([1, 2])
+col_foto, col_datos = st.columns([1, 3])
 
-# ---------- FOTO (TAMAÑO CONTROLADO) ----------
+# ---------- FOTO (MUY COMPACTA) ----------
 with col_foto:
     foto_jpg = FOTOS_DIR / f"{id_empleado}.jpg"
     foto_png = FOTOS_DIR / f"{id_empleado}.png"
 
     if foto_jpg.exists():
-        st.image(str(foto_jpg), width=220)
+        st.image(str(foto_jpg), width=150)
     elif foto_png.exists():
-        st.image(str(foto_png), width=220)
+        st.image(str(foto_png), width=150)
     else:
-        st.info("Este empleado no tiene foto.")
+        st.info("Sin foto")
 
 # ---------- DATOS DEL EMPLEADO ----------
 with col_datos:
@@ -110,4 +113,3 @@ with st.expander("📌 Servicios"):
 
 with st.expander("📄 Documentación"):
     st.info("Pendiente de implementar")
-
