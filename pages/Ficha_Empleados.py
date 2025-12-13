@@ -3,11 +3,14 @@ import pandas as pd
 from pathlib import Path
 
 # -----------------------------------------
-# CONFIGURACIÓN DE LA PÁGINA
+# CONFIGURACIÓN
 # -----------------------------------------
 st.set_page_config(layout="wide")
 st.title("Ficha de Empleado")
-st.info("Zona de consulta. Aquí se visualiza la información completa del empleado.")
+st.info(
+    "Zona de consulta central. Desde aquí se accede a toda la información "
+    "relacionada con un empleado."
+)
 
 # -----------------------------------------
 # RUTAS
@@ -18,7 +21,7 @@ EMP_FILE = DATA / "empleados.csv"
 FOTOS_DIR = DATA / "fotos_empleados"
 
 # -----------------------------------------
-# COMPROBACIONES
+# CARGA DE EMPLEADOS
 # -----------------------------------------
 if not EMP_FILE.exists():
     st.error("No hay empleados cargados todavía.")
@@ -31,13 +34,42 @@ if df.empty:
     st.stop()
 
 # -----------------------------------------
-# SELECTOR DE EMPLEADO
+# BUSCADOR GLOBAL
 # -----------------------------------------
-df["selector"] = df["id_empleado"].astype(str) + " - " + df["nombre"]
+st.subheader("Buscar empleado")
+
+busqueda = st.text_input(
+    "Busca por nombre, DNI, email, teléfono, puesto, ubicación, estado o ID",
+    placeholder="Escribe cualquier dato del empleado..."
+)
+
+df_busqueda = df.copy()
+
+if busqueda:
+    busqueda_lower = busqueda.lower()
+
+    df_busqueda = df[
+        df.astype(str)
+        .apply(lambda fila: fila.str.lower().str.contains(busqueda_lower))
+        .any(axis=1)
+    ]
+
+if df_busqueda.empty:
+    st.warning("No se encontraron empleados con ese criterio.")
+    st.stop()
+
+# -----------------------------------------
+# SELECTOR DE EMPLEADO (FILTRADO)
+# -----------------------------------------
+df_busqueda["selector"] = (
+    df_busqueda["id_empleado"].astype(str)
+    + " - "
+    + df_busqueda["nombre"]
+)
 
 empleado_sel = st.selectbox(
     "Selecciona un empleado",
-    df["selector"].tolist()
+    df_busqueda["selector"].tolist()
 )
 
 id_empleado = int(empleado_sel.split(" - ")[0])
@@ -46,7 +78,7 @@ emp = df[df["id_empleado"] == id_empleado].iloc[0]
 st.markdown("---")
 
 # -----------------------------------------
-# LAYOUT PRINCIPAL
+# LAYOUT FICHA
 # -----------------------------------------
 col_foto, col_datos = st.columns([1, 2])
 
@@ -74,12 +106,22 @@ with col_datos:
 st.markdown("---")
 
 # -----------------------------------------
-# SECCIÓN FUTURA (PREPARADA PARA CRECER)
+# ZONA CENTRAL DEL EMPLEADO (FUTURO)
 # -----------------------------------------
-with st.expander("Información adicional (próximamente)"):
-    st.write("- Vehículo asignado")
-    st.write("- EPIs entregados")
-    st.write("- Historial de ausencias")
-    st.write("- Documentación")
+st.header("Información relacionada")
+
+with st.expander("🚚 Vehículo asignado"):
+    st.info("Aquí se mostrará el vehículo del empleado.")
+
+with st.expander("📌 Servicios"):
+    st.info("Aquí se mostrarán los servicios relacionados.")
+
+with st.expander("📦 EPIs"):
+    st.info("Aquí se mostrarán los EPIs entregados.")
+
+with st.expander("📄 Documentación"):
+    st.info("Aquí se mostrará la documentación del empleado.")
+
+
 
 
