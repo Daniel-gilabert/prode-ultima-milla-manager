@@ -1,142 +1,145 @@
 import streamlit as st
 import pandas as pd
 from pathlib import Path
-import base64
-import streamlit.components.v1 as components
+import tempfile
+from utils.pdf_empleados import generar_pdf_empleados
 
-# -----------------------------------------
-# CONFIGURACIÓN
-# -----------------------------------------
-st.set_page_config(layout="wide")
-st.title("👤 Ficha de Empleado")
+# --------------------------------------------------
+# CONFIG
+# --------------------------------------------------
+st.set_page_config(page_title="Ficha Empleados", layout="wide")
 
-# -----------------------------------------
-# RUTAS
-# -----------------------------------------
-BASE = Path.cwd()
-DATA = BASE / "data"
-EMP_FILE = DATA / "empleados.csv"
-FOTOS_DIR = DATA / "fotos_empleados"
+DATA_DIR = Path("data")
+FOTOS_DIR = DATA_DIR / "fotos_empleados"
+CSV_FILE = DATA_DIR / "empleados.csv"
 
-# -----------------------------------------
-# COMPROBACIONES
-# -----------------------------------------
-if not EMP_FILE.exists():
-    st.error("No hay empleados cargados.")
+st.title("📇 Ficha de Empleados")
+
+# --------------------------------------------------
+# CARGA DE DATOS
+# --------------------------------------------------
+if not CSV_FILE.exists():
+    st.error("❌ No existe empleados.csv")
     st.stop()
 
-# -----------------------------------------
-# CARGA DE DATOS (BLINDADA)
-# -----------------------------------------
-df = pd.read_csv(
-    EMP_FILE,
-    encoding="utf-8-sig",
-    dtype={"id_empleado": str, "dni": str, "telefono": str}
-).fillna("")
+df = pd.read_csv(CSV_FILE, dtype=str).fillna("")
 
-df["telefono"] = df["telefono"].str.replace(".0", "", regex=False).str.strip()
-df["id_empleado"] = df["id_empleado"].str.strip()
-df["dni"] = df["dni"].str.strip()
+# Normalizar teléfono (evitar .0)
+df["telefono"] = df["telefono"].str.replace(".0", "", regex=False)
+
 df = df.sort_values("id_empleado").reset_index(drop=True)
 
-# -----------------------------------------
-# BUSCADOR
-# -----------------------------------------
-busqueda = st.text_input("🔍 Buscar empleado")
-
-df_filtrado = df
-if busqueda:
-    b = busqueda.lower()
-    df_filtrado = df[
-        df.astype(str).apply(lambda r: r.str.lower().str.contains(b)).any(axis=1)
-    ].reset_index(drop=True)
-
-if df_filtrado.empty:
-    st.warning("No se encontraron empleados.")
-    st.stop()
-
-# -----------------------------------------
-# NAVEGACIÓN
-# -----------------------------------------
+# --------------------------------------------------
+# ESTADO DE NAVEGACIÓN
+# --------------------------------------------------
 if "idx_emp" not in st.session_state:
     st.session_state.idx_emp = 0
 
-max_idx = len(df_filtrado) - 1
-st.session_state.idx_emp = max(0, min(st.session_state.idx_emp, max_idx))
+total = len(df)
 
-_, c1, c2, c3, c4 = st.columns([12, .6, .6, .6, .6])
-with c1:
-    if st.button("⏮"): st.session_state.idx_emp = 0
-with c2:
-    if st.button("◀") and st.session_state.idx_emp > 0: st.session_state.idx_emp -= 1
-with c3:
-    if st.button("▶") and st.session_state.idx_emp < max_idx: st.session_state.idx_emp += 1
-with c4:
-    if st.button("⏭"): st.session_state.idx_emp = max_idx
+def ir_primero(): st.session_state.idx_emp = 0
+def ir_anterior(): st.session_state.idx_emp = max(0, st.session_state.idx_emp - 1)
+def ir_siguiente(): st.session_state.idx_emp = min(total - 1, st.session_state.idx_emp + 1)
+def ir_ultimo(): st.session_state.idx_emp = total - 1
+
+# --------------------------------------------------
+# SELECTOR + BOTONES
+# --------------------------------------------------
+col_sel, col_nav = st.columns([6, 4])
+
+with col_sel:
+    opciones = [f"{row.id_empleado} - {row.nombre}" for _, row in df.iterrows()]
+    seleccion = st.selectbox(
+        "Selecciona un empleado",
+        range(total),
+        format_func=lambda i: opciones[i],
+        index=st.session_state.idx_emp
+    )
+    st.session_state.idx_emp = seleccion
+
+with col_nav:
+    c1, c2, c3, c4 = st.columns([1,1,1,1])
+    c1.button("⏮", on_click=ir_primero)
+    c2.button("◀", on_click=ir_anterior)
+    c3.button("▶", on_click=ir_siguiente)
+    c4.button("⏭", on_click=ir_ultimo)
+
+# --------------------------------------------------
+# EMPLEADO ACTUAL
+# --------------------------------------------------
+emp = df.iloc[st.session_state.idx_emp]
 
 st.markdown("---")
 
-emp = df_filtrado.iloc[st.session_state.idx_emp]
-id_empleado = emp["id_empleado"]
-
-# -----------------------------------------
+# --------------------------------------------------
 # FICHA VISUAL
-# -----------------------------------------
-col_foto, col_datos = st.columns([1, 3])
+# --------------------------------------------------
+col_foto, col_datos = st.columns([2, 5])
 
 with col_foto:
-    foto_path = FOTOS_DIR / f"{id_empleado}.jpg"
-    if foto_path.exists():
-        st.image(str(foto_path), width=140)
+    foto = FOTOS_DIR / f"{emp.id_empleado}.jpg"
+    if foto.exists():
+        st.image(str(foto), width=140)
     else:
-        st.info("Sin foto")
+        st.image("https://via.placeholder.com/140x140?text=Sin+Foto")
 
 with col_datos:
-    st.subheader(emp["nombre"])
-    st.write("ID:", emp["id_empleado"])
-    st.write("DNI:", emp["dni"])
-    st.write("Email:", emp["email"])
-    st.write("Teléfono:", emp["telefono"])
-    st.write("Puesto:", emp["puesto"])
-    st.write("Ubicación:", emp["ubicacion"])
-    st.write("Estado:", emp["estado"])
+    st.subheader(emp.nombre)
 
-# -----------------------------------------
-# HTML PARA IMPRESIÓN
-# -----------------------------------------
-def generar_html_impresion(emp, foto_path):
-    foto_html = ""
-    if foto_path.exists():
-        img_bytes = foto_path.read_bytes()
-        img_b64 = base64.b64encode(img_bytes).decode()
-        foto_html = f"<img src='data:image/jpeg;base64,{img_b64}' width='120'>"
+    st.markdown(f"""
+🆔 **ID empleado:** {emp.id_empleado}  
+🪪 **DNI:** {emp.dni}  
+✉ **Email:** <a href="mailto:{emp.email}">{emp.email}</a>  
+📞 **Teléfono:** <a href="tel:{emp.telefono}">{emp.telefono}</a>  
+💼 **Puesto:** {emp.puesto}  
+📍 **Ubicación:** {emp.ubicacion}  
+✅ **Estado:** {emp.estado}
+""", unsafe_allow_html=True)
 
-    return f"""
-    <html>
-    <head>
-        <style>
-            body {{ font-family: Arial; padding: 30px; }}
-            h1 {{ border-bottom: 1px solid #ccc; }}
-            .fila {{ margin-bottom: 8px; }}
-        </style>
-    </head>
-    <body onload="window.print()">
-        {foto_html}
-        <h1>{emp['nombre']}</h1>
-        <div class="fila"><b>ID:</b> {emp['id_empleado']}</div>
-        <div class="fila"><b>DNI:</b> {emp['dni']}</div>
-        <div class="fila"><b>Email:</b> {emp['email']}</div>
-        <div class="fila"><b>Teléfono:</b> {emp['telefono']}</div>
-        <div class="fila"><b>Puesto:</b> {emp['puesto']}</div>
-        <div class="fila"><b>Ubicación:</b> {emp['ubicacion']}</div>
-        <div class="fila"><b>Estado:</b> {emp['estado']}</div>
-    </body>
-    </html>
-    """
+st.markdown("---")
 
-# -----------------------------------------
-# BOTÓN IMPRIMIR REAL
-# -----------------------------------------
-if st.button("🖨 Imprimir ficha"):
-    html = generar_html_impresion(emp, foto_path)
-    components.html(html, height=1)
+# --------------------------------------------------
+# PDF INDIVIDUAL
+# --------------------------------------------------
+st.subheader("📄 Exportar ficha")
+
+if st.button("📄 Generar PDF de esta ficha"):
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+        generar_pdf_empleados(
+            [emp.to_dict()],
+            FOTOS_DIR,
+            tmp.name
+        )
+        with open(tmp.name, "rb") as f:
+            st.download_button(
+                "⬇ Descargar PDF",
+                f,
+                file_name=f"Ficha_{emp.nombre}.pdf",
+                mime="application/pdf"
+            )
+
+# --------------------------------------------------
+# PDF MÚLTIPLE
+# --------------------------------------------------
+st.subheader("📑 Exportar varias fichas")
+
+seleccionados = st.multiselect(
+    "Selecciona empleados",
+    df["nombre"].tolist()
+)
+
+if seleccionados and st.button("📄 Generar PDF múltiple"):
+    empleados_sel = df[df["nombre"].isin(seleccionados)].to_dict("records")
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+        generar_pdf_empleados(
+            empleados_sel,
+            FOTOS_DIR,
+            tmp.name
+        )
+        with open(tmp.name, "rb") as f:
+            st.download_button(
+                "⬇ Descargar PDF",
+                f,
+                file_name="Fichas_Empleados_PRODE.pdf",
+                mime="application/pdf"
+            )
