@@ -4,177 +4,164 @@ from pathlib import Path
 from datetime import date
 
 # --------------------------------------------------
-# CONFIG
+# CONFIGURACIÓN PÁGINA
 # --------------------------------------------------
 st.set_page_config(page_title="Ficha de Vehículos", layout="wide")
-st.title("🚗 Ficha de Vehículos")
 
-DATA = Path("data")
+# --------------------------------------------------
+# RUTAS
+# --------------------------------------------------
+BASE = Path.cwd()
+DATA = BASE / "data"
+
 VEH_FILE = DATA / "vehiculos.json"
 EMP_FILE = DATA / "empleados.json"
 
 # --------------------------------------------------
+# FUNCIONES SEGURAS
+# --------------------------------------------------
+def load_json(path: Path):
+    """Carga JSON aunque esté vacío o roto"""
+    if not path.exists():
+        return []
+    try:
+        content = path.read_text(encoding="utf-8").strip()
+        if not content:
+            return []
+        return json.loads(content)
+    except Exception:
+        return []
+
+# --------------------------------------------------
 # CARGA DE DATOS
 # --------------------------------------------------
-def load_json(path):
-    if path.exists():
-        return json.loads(path.read_text(encoding="utf-8"))
-    return []
-
 vehiculos = load_json(VEH_FILE)
 empleados = load_json(EMP_FILE)
 
+# --------------------------------------------------
+# MAPA EMPLEADOS
+# --------------------------------------------------
+emp_map = {e.get("id_empleado"): e for e in empleados}
+
+# --------------------------------------------------
+# UI
+# --------------------------------------------------
+st.title("🚗 Ficha de Vehículos")
+
 if not vehiculos:
-    st.warning("No hay vehículos cargados.")
+    st.warning("No hay vehículos cargados en el sistema.")
     st.stop()
 
-# --------------------------------------------------
-# ORDENAR POR ID
-# --------------------------------------------------
-vehiculos = sorted(
-    vehiculos,
-    key=lambda x: int(x["id_vehiculo"]) if x.get("id_vehiculo") else 9999
-)
+# Ordenar por id_vehiculo
+vehiculos = sorted(vehiculos, key=lambda x: x.get("id_vehiculo", 0))
 
-# --------------------------------------------------
-# SELECTOR VEHÍCULO
-# --------------------------------------------------
-labels = [
-    f'{v.get("id_vehiculo", "-")} - {v["matricula"]} ({v["marca"]})'
-    for v in vehiculos
-]
-
+# Inicializar índice
 if "veh_index" not in st.session_state:
     st.session_state.veh_index = 0
 
+# Selector
+opciones = [
+    f"{v.get('id_vehiculo')} - {v.get('matricula')}"
+    for v in vehiculos
+]
+
 selected = st.selectbox(
     "Selecciona un vehículo",
-    range(len(labels)),
-    format_func=lambda i: labels[i],
+    opciones,
     index=st.session_state.veh_index
 )
 
-vehiculo = vehiculos[selected]
-st.session_state.veh_index = selected
+st.session_state.veh_index = opciones.index(selected)
+veh = vehiculos[st.session_state.veh_index]
 
 # --------------------------------------------------
-# NAVEGACIÓN (COMPACTA Y A LA DERECHA)
+# BOTONES NAVEGACIÓN (muy juntos y a la derecha)
 # --------------------------------------------------
-_, _, nav = st.columns([6, 1, 2])
-
+_, _, nav = st.columns([6, 1, 3])
 with nav:
-    c1, c2, c3, c4 = st.columns([1,1,1,1], gap="small")
-
+    c1, c2, c3, c4 = st.columns([1, 1, 1, 1])
     with c1:
         if st.button("⏮", key="first"):
             st.session_state.veh_index = 0
             st.rerun()
     with c2:
         if st.button("◀", key="prev"):
-            st.session_state.veh_index = max(0, selected - 1)
+            st.session_state.veh_index = max(0, st.session_state.veh_index - 1)
             st.rerun()
     with c3:
         if st.button("▶", key="next"):
-            st.session_state.veh_index = min(len(vehiculos)-1, selected + 1)
+            st.session_state.veh_index = min(len(vehiculos) - 1, st.session_state.veh_index + 1)
             st.rerun()
     with c4:
         if st.button("⏭", key="last"):
-            st.session_state.veh_index = len(vehiculos)-1
+            st.session_state.veh_index = len(vehiculos) - 1
             st.rerun()
 
 st.divider()
 
 # --------------------------------------------------
-# INFO PRINCIPAL
+# FICHA VEHÍCULO
 # --------------------------------------------------
-col1, col2 = st.columns([1, 2])
+col1, col2 = st.columns([1, 3])
 
 with col1:
-    st.markdown("### 📄 Datos del vehículo")
-    st.write(f"**ID:** {vehiculo.get('id_vehiculo','-')}")
-    st.write(f"**Matrícula:** {vehiculo['matricula']}")
-    st.write(f"**Bastidor:** {vehiculo.get('bastidor','-')}")
-    st.write(f"**Marca:** {vehiculo['marca']}")
-    st.write(f"**Modelo:** {vehiculo.get('modelo','-')}")
-    st.write(f"**Tipo:** {vehiculo['tipo']}")
-    st.write(f"**Estado:** {vehiculo.get('estado','OPERATIVO')}")
+    st.markdown("### 🚘")
+    st.info("Imagen vehículo\n(próximamente)")
 
 with col2:
-    st.markdown("### 👤 Asignación a empleado")
+    st.markdown(f"## {veh.get('marca', '')} {veh.get('modelo', '')}")
+    st.markdown(f"**🆔 ID vehículo:** {veh.get('id_vehiculo')}")
+    st.markdown(f"**🔢 Matrícula:** {veh.get('matricula')}")
+    st.markdown(f"**🏷️ Bastidor:** {veh.get('bastidor', '—')}")
+    st.markdown(f"**📄 Tipo:** {veh.get('tipo', '—')}")
+    st.markdown(f"**⚙️ Estado:** {veh.get('estado', 'OPERATIVO')}")
 
-    emp_map = {None: "— Sin asignar —"}
-    for e in empleados:
-        emp_map[e["id_empleado"]] = f'{e["id_empleado"]} - {e["nombre"]}'
+    # Asignación empleado
+    emp_id = veh.get("empleado_id")
+    if emp_id and emp_id in emp_map:
+        emp = emp_map[emp_id]
+        st.markdown(
+            f"**👤 Asignado a:** {emp.get('nombre')} "
+            f"({emp.get('email')})"
+        )
+    else:
+        st.markdown("**👤 Asignado a:** No asignado")
 
-    empleado_actual = vehiculo.get("empleado_id")
-
-    nuevo_emp = st.selectbox(
-        "Empleado asignado",
-        options=list(emp_map.keys()),
-        format_func=lambda x: emp_map[x],
-        index=list(emp_map.keys()).index(empleado_actual)
-        if empleado_actual in emp_map else 0
-    )
-
-    if nuevo_emp != empleado_actual:
-        vehiculo["empleado_id"] = nuevo_emp
-
-# --------------------------------------------------
-# ITV
-# --------------------------------------------------
-st.divider()
-st.markdown("### 🛠️ ITV")
-
-vehiculo["itv_vigente_hasta"] = st.date_input(
-    "Vigente hasta",
-    value=date.fromisoformat(vehiculo["itv_vigente_hasta"])
-    if vehiculo.get("itv_vigente_hasta") else None
-)
-
-vehiculo["itv_cita_fecha"] = st.date_input(
-    "Fecha cita ITV",
-    value=date.fromisoformat(vehiculo["itv_cita_fecha"])
-    if vehiculo.get("itv_cita_fecha") else None
-)
-
-vehiculo["itv_estacion"] = st.text_input(
-    "Estación ITV",
-    vehiculo.get("itv_estacion","")
-)
-
-st.link_button(
-    "🌐 Pedir cita ITV Junta de Andalucía",
-    "https://www.juntadeandalucia.es/organismos/itv.html"
-)
-
-# --------------------------------------------------
-# SEGURO
-# --------------------------------------------------
-st.divider()
-st.markdown("### 🛡️ Seguro")
-
-vehiculo["seguro_aseguradora"] = st.text_input(
-    "Aseguradora",
-    vehiculo.get("seguro_aseguradora","")
-)
-
-vehiculo["seguro_poliza"] = st.text_input(
-    "Número de póliza",
-    vehiculo.get("seguro_poliza","")
-)
-
-vehiculo["seguro_vigente_hasta"] = st.date_input(
-    "Seguro vigente hasta",
-    value=date.fromisoformat(vehiculo["seguro_vigente_hasta"])
-    if vehiculo.get("seguro_vigente_hasta") else None
-)
-
-# --------------------------------------------------
-# GUARDAR
-# --------------------------------------------------
 st.divider()
 
-if st.button("💾 Guardar cambios del vehículo"):
-    with open(VEH_FILE, "w", encoding="utf-8") as f:
-        json.dump(vehiculos, f, indent=2, ensure_ascii=False)
-    st.success("✅ Vehículo actualizado correctamente")
+# --------------------------------------------------
+# ITV / SEGURO
+# --------------------------------------------------
+st.subheader("📅 ITV y Seguro")
+
+col_itv, col_seg = st.columns(2)
+
+with col_itv:
+    st.markdown(f"**ITV vigente hasta:** {veh.get('itv_vigente_hasta', '—')}")
+    st.markdown(f"**Estación ITV:** {veh.get('itv_estacion', '—')}")
+    if veh.get("itv_cita"):
+        st.markdown(f"**📌 Cita ITV:** {veh.get('itv_cita')}")
+        st.link_button(
+            "Pedir cita ITV Andalucía",
+            "https://www.itvcita.com"
+        )
+
+with col_seg:
+    st.markdown(f"**Aseguradora:** {veh.get('aseguradora', '—')}")
+    st.markdown(f"**Póliza:** {veh.get('poliza', '—')}")
+    st.markdown(f"**Seguro vigente hasta:** {veh.get('seguro_vigente_hasta', '—')}")
+
+st.divider()
+
+# --------------------------------------------------
+# BLOQUES FUTUROS
+# --------------------------------------------------
+st.subheader("📂 Documentación")
+st.info("Repositorio por matrícula (pendiente de implementación)")
+
+st.subheader("🛠️ Historial de averías")
+st.info("Se gestionará desde mantenimiento")
+
+st.subheader("🚨 Avisos automáticos")
+st.info("Avisos por email 30 días antes ITV y 7 días antes de cita")
+
