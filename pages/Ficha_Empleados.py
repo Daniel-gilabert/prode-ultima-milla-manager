@@ -151,3 +151,4 @@ if seleccionados and st.button("📄 Generar PDF múltiple"):
                 mime="application/pdf"
             )
 
+
