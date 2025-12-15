@@ -1,224 +1,149 @@
 import streamlit as st
 import json
 from pathlib import Path
-import math
 
 # --------------------------------------------------
-# CONFIG
+# CONFIGURACIÓN
 # --------------------------------------------------
-st.set_page_config(page_title="Ficha Vehículos", layout="wide")
+st.set_page_config(layout="wide")
 
-BASE_PATH = Path(__file__).resolve().parent.parent
-DATA_PATH = BASE_PATH / "data"
-
-VEH_FILE = DATA_PATH / "vehiculos.json"
-EMP_FILE = DATA_PATH / "empleados.json"
-FOTOS_EMP = DATA_PATH / "fotos_empleados"
-FOTOS_VEH = DATA_PATH / "fotos_vehiculos"
+DATA = Path("data")
+VEH_FILE = DATA / "vehiculos.json"
+EMP_FILE = DATA / "empleados.json"
+FOTOS_EMP = DATA / "fotos_empleados"
+FOTOS_VEH = DATA / "fotos_vehiculos"
 
 # --------------------------------------------------
-# MAPA FOTOS VEHÍCULOS (CORREGIDO)
+# FUNCIONES
 # --------------------------------------------------
-MAPA_FOTOS_VEHICULOS = {
-    "paxster": "paxster.jpg",
-    "scoobic": "scoobic.jpg",
-    "renault": "renault.jpg",
-}
-
-# --------------------------------------------------
-# HELPERS
-# --------------------------------------------------
-def load_json(path: Path):
+def load_json_safe(path):
     if not path.exists():
         return []
     try:
-        content = path.read_text(encoding="utf-8").strip()
-        if not content:
+        contenido = path.read_text(encoding="utf-8").strip()
+        if not contenido:
             return []
-        return json.loads(content)
+        return json.loads(contenido)
     except Exception:
         return []
 
-def clean(value):
-    if value is None:
+def limpiar(valor):
+    if valor is None:
         return ""
-    if isinstance(value, float) and math.isnan(value):
+    if isinstance(valor, float):
         return ""
-    return str(value)
-
-def obtener_foto_vehiculo(marca):
-    if not marca:
-        return None
-    clave = marca.strip().lower()
-    nombre = MAPA_FOTOS_VEHICULOS.get(clave)
-    if not nombre:
-        return None
-    ruta = FOTOS_VEH / nombre
-    return ruta if ruta.exists() else None
+    return str(valor)
 
 # --------------------------------------------------
-# DATA
+# CARGA DE DATOS
 # --------------------------------------------------
-vehiculos = load_json(VEH_FILE)
-empleados = load_json(EMP_FILE)
+vehiculos = load_json_safe(VEH_FILE)
+empleados = load_json_safe(EMP_FILE)
 
 if not vehiculos:
-    st.warning("No hay vehículos cargados en el sistema.")
+    st.warning("⚠️ No hay vehículos cargados en el sistema.")
+    st.info("👉 Cárgalos desde **Administrar Vehículos**.")
     st.stop()
 
-# --------------------------------------------------
-# SESSION
-# --------------------------------------------------
-if "veh_index" not in st.session_state:
-    st.session_state.veh_index = 0
+# Indexar empleados por id
+empleados_por_id = {
+    int(e["id_empleado"]): e for e in empleados if str(e.get("id_empleado", "")).isdigit()
+}
 
-st.session_state.veh_index = max(
-    0, min(st.session_state.veh_index, len(vehiculos) - 1)
+# --------------------------------------------------
+# SELECTOR VEHÍCULO
+# --------------------------------------------------
+vehiculos = sorted(vehiculos, key=lambda x: x.get("id_vehiculo", 0))
+
+opciones = {
+    f'{v["id_vehiculo"]} - {v.get("matricula", "")}': v
+    for v in vehiculos
+}
+
+st.title("🚗 Ficha de Vehículos")
+
+clave = st.selectbox(
+    "Selecciona un vehículo",
+    opciones.keys()
 )
 
-vehiculo = vehiculos[st.session_state.veh_index]
+veh = opciones[clave]
 
 # --------------------------------------------------
-# HEADER
+# DATOS PRINCIPALES
 # --------------------------------------------------
-st.markdown("## 🚗 Ficha de Vehículos")
-
-# --------------------------------------------------
-# SELECTOR + NAV
-# --------------------------------------------------
-c1, c2, c3, c4, c5 = st.columns([5, 1, 1, 1, 1])
-
-with c1:
-    opciones = [
-        f"{v.get('id_vehiculo')} - {v.get('matricula', '')}"
-        for v in vehiculos
-    ]
-    seleccion = st.selectbox(
-        "Selecciona un vehículo",
-        opciones,
-        index=st.session_state.veh_index
-    )
-    st.session_state.veh_index = opciones.index(seleccion)
-
-with c2:
-    if st.button("⏮"):
-        st.session_state.veh_index = 0
-        st.rerun()
-with c3:
-    if st.button("◀"):
-        st.session_state.veh_index -= 1
-        st.rerun()
-with c4:
-    if st.button("▶"):
-        st.session_state.veh_index += 1
-        st.rerun()
-with c5:
-    if st.button("⏭"):
-        st.session_state.veh_index = len(vehiculos) - 1
-        st.rerun()
-
-vehiculo = vehiculos[st.session_state.veh_index]
-
-st.divider()
+id_veh = veh.get("id_vehiculo")
+matricula = limpiar(veh.get("matricula"))
+marca = limpiar(veh.get("marca"))
+modelo = limpiar(veh.get("modelo"))
+bastidor = limpiar(veh.get("bastidor"))
+tipo = limpiar(veh.get("tipo")).lower()
+estado = limpiar(veh.get("estado", "OPERATIVO"))
+id_emp = veh.get("id_empleado")
 
 # --------------------------------------------------
 # EMPLEADO ASIGNADO
 # --------------------------------------------------
-empleado = None
-empleado_id = vehiculo.get("empleado_id")
+empleado = empleados_por_id.get(id_emp)
+nombre_emp = empleado["nombre"] if empleado else "No asignado"
 
-if empleado_id:
-    empleado = next(
-        (e for e in empleados if e.get("id_empleado") == empleado_id),
-        None
-    )
+# Foto empleado
+foto_emp = None
+if empleado:
+    posible = FOTOS_EMP / f'{empleado["id_empleado"]}.jpg'
+    if posible.exists():
+        foto_emp = posible
 
 # --------------------------------------------------
-# LAYOUT PRINCIPAL
+# FOTO VEHÍCULO (POR MARCA)
 # --------------------------------------------------
-c_left, c_mid, c_right = st.columns([1.2, 2.6, 1.2])
+foto_veh = None
+marca_lower = marca.lower()
 
-# ---------- FOTO EMPLEADO ----------
-with c_left:
-    if empleado:
-        foto_emp = FOTOS_EMP / f"{empleado_id}.jpg"
-        if foto_emp.exists():
-            st.image(str(foto_emp), width=130)
-        else:
-            st.image(
-                "https://cdn-icons-png.flaticon.com/512/4140/4140037.png",
-                width=130
-            )
+if "paxster" in marca_lower:
+    foto_veh = FOTOS_VEH / "paxster.jpg"
+elif "scoobic" in marca_lower:
+    foto_veh = FOTOS_VEH / "scoobic.jpg"
+elif "renault" in marca_lower:
+    foto_veh = FOTOS_VEH / "renault.jpg"
+
+# --------------------------------------------------
+# UI
+# --------------------------------------------------
+st.markdown("---")
+
+col_foto_emp, col_info, col_foto_veh = st.columns([1.2, 2.2, 1.4])
+
+# FOTO EMPLEADO
+with col_foto_emp:
+    if foto_emp:
+        st.image(str(foto_emp), width=160)
     else:
-        st.image(
-            "https://cdn-icons-png.flaticon.com/512/149/149071.png",
-            width=130
-        )
+        st.info("Empleado sin foto")
 
-# ---------- DATOS VEHÍCULO ----------
-with c_mid:
-    st.markdown(f"### 🚘 {clean(vehiculo.get('matricula'))}")
+# INFO VEHÍCULO
+with col_info:
+    st.subheader(matricula)
+    st.caption(f"{marca} {modelo}")
 
-    st.markdown(f"""
-- 🆔 **ID vehículo:** {clean(vehiculo.get('id_vehiculo'))}
-- 🏷 **Marca / Modelo:** {clean(vehiculo.get('marca'))} {clean(vehiculo.get('modelo'))}
-- 🔑 **Bastidor:** {clean(vehiculo.get('bastidor')) or "—"}
-- 📄 **Tipo:** {clean(vehiculo.get('tipo')).capitalize()}
-- 🚦 **Estado:** {clean(vehiculo.get('estado', 'OPERATIVO'))}
-- 👤 **Asignado a:** {empleado.get('nombre') if empleado else "No asignado"}
-    """)
+    st.markdown(f"🆔 **ID vehículo:** {id_veh}")
+    st.markdown(f"🏷️ **Tipo:** {tipo}")
+    st.markdown(f"⚙️ **Estado:** {estado}")
+    st.markdown(f"🔩 **Bastidor:** {bastidor or '—'}")
+    st.markdown(f"👤 **Asignado a:** {nombre_emp}")
 
-# ---------- IMAGEN VEHÍCULO ----------
-with c_right:
-    foto_veh = obtener_foto_vehiculo(vehiculo.get("marca"))
-    if foto_veh:
-        st.image(str(foto_veh), width=160, caption="Vehículo")
+# FOTO VEHÍCULO
+with col_foto_veh:
+    if foto_veh and foto_veh.exists():
+        st.image(str(foto_veh), use_container_width=True)
     else:
-        st.image(
-            "https://cdn-icons-png.flaticon.com/512/741/741407.png",
-            width=160,
-            caption="Vehículo"
-        )
+        st.info("Imagen vehículo no disponible")
+
+st.markdown("---")
 
 # --------------------------------------------------
-# ITV
+# FUTURAS SECCIONES
 # --------------------------------------------------
-st.divider()
-st.subheader("🛠 ITV")
-
-st.markdown(f"""
-- 📅 **ITV vigente hasta:** {clean(vehiculo.get('itv_vigente_hasta')) or "No indicada"}
-- 🏢 **Estación ITV:** {clean(vehiculo.get('itv_estacion')) or "No indicada"}
-""")
-
-if st.button("🌐 Pedir cita ITV (Junta de Andalucía)"):
-    st.markdown(
-        "[Abrir web ITV Andalucía]"
-        "(https://www.citaprevia.veiasa.es/)"
-    )
-
-# --------------------------------------------------
-# SEGURO
-# --------------------------------------------------
-st.divider()
-st.subheader("🛡 Seguro")
-
-st.markdown(f"""
-- 🏢 **Aseguradora:** {clean(vehiculo.get('aseguradora')) or "No indicada"}
-- 📄 **Nº póliza:** {clean(vehiculo.get('poliza')) or "No indicado"}
-- 📅 **Vigencia:** {clean(vehiculo.get('seguro_vigente_hasta')) or "No indicada"}
-""")
-
-# --------------------------------------------------
-# FUTURO
-# --------------------------------------------------
-st.divider()
-st.subheader("📂 Documentación")
-st.info("ITV, seguro, multas y documentos del vehículo.")
-
-st.divider()
-st.subheader("🧰 Historial de averías")
-st.info("Historial de incidencias, talleres y reparaciones.")
-
-
+st.subheader("📌 Información adicional")
+st.info("Aquí se integrarán: ITV, seguros, averías, multas y documentación.")
 
