@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from pathlib import Path
+import base64
 import streamlit.components.v1 as components
 
 # -----------------------------------------
@@ -30,48 +31,32 @@ if not EMP_FILE.exists():
 df = pd.read_csv(
     EMP_FILE,
     encoding="utf-8-sig",
-    dtype={
-        "id_empleado": str,
-        "dni": str,
-        "telefono": str
-    }
+    dtype={"id_empleado": str, "dni": str, "telefono": str}
 ).fillna("")
 
-df["telefono"] = (
-    df["telefono"]
-    .astype(str)
-    .str.replace(".0", "", regex=False)
-    .str.strip()
-)
-
+df["telefono"] = df["telefono"].str.replace(".0", "", regex=False).str.strip()
 df["id_empleado"] = df["id_empleado"].str.strip()
 df["dni"] = df["dni"].str.strip()
-
 df = df.sort_values("id_empleado").reset_index(drop=True)
 
 # -----------------------------------------
-# BUSCADOR GLOBAL
+# BUSCADOR
 # -----------------------------------------
-busqueda = st.text_input(
-    "🔍 Buscar empleado (nombre, DNI, email, teléfono, puesto, ubicación...)"
-)
+busqueda = st.text_input("🔍 Buscar empleado")
 
-df_filtrado = df.copy()
-
+df_filtrado = df
 if busqueda:
     b = busqueda.lower()
     df_filtrado = df[
-        df.astype(str)
-        .apply(lambda fila: fila.str.lower().str.contains(b))
-        .any(axis=1)
+        df.astype(str).apply(lambda r: r.str.lower().str.contains(b)).any(axis=1)
     ].reset_index(drop=True)
 
 if df_filtrado.empty:
-    st.warning("No se encontró ningún empleado.")
+    st.warning("No se encontraron empleados.")
     st.stop()
 
 # -----------------------------------------
-# ESTADO DE NAVEGACIÓN
+# NAVEGACIÓN
 # -----------------------------------------
 if "idx_emp" not in st.session_state:
     st.session_state.idx_emp = 0
@@ -79,126 +64,80 @@ if "idx_emp" not in st.session_state:
 max_idx = len(df_filtrado) - 1
 st.session_state.idx_emp = max(0, min(st.session_state.idx_emp, max_idx))
 
-# -----------------------------------------
-# BOTONES DE NAVEGACIÓN (ULTRA COMPACTOS)
-# -----------------------------------------
-espacio, c1, c2, c3, c4 = st.columns([12, 0.6, 0.6, 0.6, 0.6])
-
+_, c1, c2, c3, c4 = st.columns([12, .6, .6, .6, .6])
 with c1:
-    if st.button("⏮", help="Primero"):
-        st.session_state.idx_emp = 0
+    if st.button("⏮"): st.session_state.idx_emp = 0
 with c2:
-    if st.button("◀", help="Anterior"):
-        if st.session_state.idx_emp > 0:
-            st.session_state.idx_emp -= 1
+    if st.button("◀") and st.session_state.idx_emp > 0: st.session_state.idx_emp -= 1
 with c3:
-    if st.button("▶", help="Siguiente"):
-        if st.session_state.idx_emp < max_idx:
-            st.session_state.idx_emp += 1
+    if st.button("▶") and st.session_state.idx_emp < max_idx: st.session_state.idx_emp += 1
 with c4:
-    if st.button("⏭", help="Último"):
-        st.session_state.idx_emp = max_idx
+    if st.button("⏭"): st.session_state.idx_emp = max_idx
 
 st.markdown("---")
 
-# -----------------------------------------
-# EMPLEADO ACTUAL
-# -----------------------------------------
 emp = df_filtrado.iloc[st.session_state.idx_emp]
 id_empleado = emp["id_empleado"]
 
 # -----------------------------------------
-# LAYOUT
+# FICHA VISUAL
 # -----------------------------------------
 col_foto, col_datos = st.columns([1, 3])
 
-# ---------- FOTO ----------
 with col_foto:
-    foto_jpg = FOTOS_DIR / f"{id_empleado}.jpg"
-    foto_png = FOTOS_DIR / f"{id_empleado}.png"
-
-    if foto_jpg.exists():
-        st.image(str(foto_jpg), width=140)
-    elif foto_png.exists():
-        st.image(str(foto_png), width=140)
+    foto_path = FOTOS_DIR / f"{id_empleado}.jpg"
+    if foto_path.exists():
+        st.image(str(foto_path), width=140)
     else:
         st.info("Sin foto")
 
-# ---------- DATOS ----------
 with col_datos:
     st.subheader(emp["nombre"])
-
-    st.markdown(f"**🆔 ID empleado:** {emp['id_empleado']}")
-    st.markdown(f"**🪪 DNI:** {emp['dni']}")
-
-    # EMAIL
-    if emp["email"]:
-        st.markdown(
-            f"**✉️ Email:** <a href='mailto:{emp['email']}'>{emp['email']}</a>",
-            unsafe_allow_html=True
-        )
-
-    # TELÉFONO + WHATSAPP
-    if emp["telefono"]:
-        tel = emp["telefono"]
-        st.markdown(
-            f"""
-            **📞 Teléfono:** 
-            <a href='tel:{tel}'>{tel}</a>
-            &nbsp;&nbsp;|&nbsp;&nbsp;
-            <a href='https://wa.me/34{tel}' target='_blank'>💬 WhatsApp</a>
-            """,
-            unsafe_allow_html=True
-        )
-
-    st.markdown(f"**💼 Puesto:** {emp['puesto']}")
-    st.markdown(f"**📍 Ubicación:** {emp['ubicacion']}")
-    st.markdown(f"**✅ Estado:** {emp['estado']}")
-
-    # -----------------------------------------
-    # BOTÓN IMPRIMIR (VISTA PREVIA REAL)
-    # -----------------------------------------
-    components.html(
-        """
-        <div style="margin-top:12px;">
-            <button onclick="window.print()" style="
-                padding:6px 14px;
-                border-radius:6px;
-                border:1px solid #ccc;
-                background:#f5f5f5;
-                cursor:pointer;
-                font-size:14px;
-            ">
-                🖨 Imprimir ficha
-            </button>
-        </div>
-        """,
-        height=60
-    )
-
-st.markdown("---")
+    st.write("ID:", emp["id_empleado"])
+    st.write("DNI:", emp["dni"])
+    st.write("Email:", emp["email"])
+    st.write("Teléfono:", emp["telefono"])
+    st.write("Puesto:", emp["puesto"])
+    st.write("Ubicación:", emp["ubicacion"])
+    st.write("Estado:", emp["estado"])
 
 # -----------------------------------------
-# INFORMACIÓN RELACIONADA
+# HTML PARA IMPRESIÓN
 # -----------------------------------------
-st.header("📂 Información relacionada")
+def generar_html_impresion(emp, foto_path):
+    foto_html = ""
+    if foto_path.exists():
+        img_bytes = foto_path.read_bytes()
+        img_b64 = base64.b64encode(img_bytes).decode()
+        foto_html = f"<img src='data:image/jpeg;base64,{img_b64}' width='120'>"
 
-with st.expander("🚚 Vehículo asignado"):
-    st.info("Aquí se mostrará el vehículo asignado al empleado.")
+    return f"""
+    <html>
+    <head>
+        <style>
+            body {{ font-family: Arial; padding: 30px; }}
+            h1 {{ border-bottom: 1px solid #ccc; }}
+            .fila {{ margin-bottom: 8px; }}
+        </style>
+    </head>
+    <body onload="window.print()">
+        {foto_html}
+        <h1>{emp['nombre']}</h1>
+        <div class="fila"><b>ID:</b> {emp['id_empleado']}</div>
+        <div class="fila"><b>DNI:</b> {emp['dni']}</div>
+        <div class="fila"><b>Email:</b> {emp['email']}</div>
+        <div class="fila"><b>Teléfono:</b> {emp['telefono']}</div>
+        <div class="fila"><b>Puesto:</b> {emp['puesto']}</div>
+        <div class="fila"><b>Ubicación:</b> {emp['ubicacion']}</div>
+        <div class="fila"><b>Estado:</b> {emp['estado']}</div>
+    </body>
+    </html>
+    """
 
-with st.expander("📦 EPIs"):
-    st.info("Listado de EPIs entregados y pendientes.")
-
-with st.expander("📌 Servicios"):
-    st.info("Servicios en los que ha participado el empleado.")
-
-with st.expander("📄 Documentación"):
-    st.info("Contratos, reconocimientos médicos, certificados, etc.")
-
-
-
-
-
-
-
+# -----------------------------------------
+# BOTÓN IMPRIMIR REAL
+# -----------------------------------------
+if st.button("🖨 Imprimir ficha"):
+    html = generar_html_impresion(emp, foto_path)
+    components.html(html, height=1)
 
