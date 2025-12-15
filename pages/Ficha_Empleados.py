@@ -24,9 +24,11 @@ if not CSV_FILE.exists():
 
 df = pd.read_csv(CSV_FILE, dtype=str).fillna("")
 
-# Normalizar teléfono (evitar .0)
+# Normalizar tipos
+df["id_empleado"] = df["id_empleado"].astype(int)
 df["telefono"] = df["telefono"].str.replace(".0", "", regex=False)
 
+# ORDENAR POR ID
 df = df.sort_values("id_empleado").reset_index(drop=True)
 
 # --------------------------------------------------
@@ -43,9 +45,9 @@ def ir_siguiente(): st.session_state.idx_emp = min(total - 1, st.session_state.i
 def ir_ultimo(): st.session_state.idx_emp = total - 1
 
 # --------------------------------------------------
-# SELECTOR + BOTONES
+# SELECTOR + NAVEGACIÓN
 # --------------------------------------------------
-col_sel, col_nav = st.columns([6, 4])
+col_sel, col_nav = st.columns([7, 5])
 
 with col_sel:
     opciones = [f"{row.id_empleado} - {row.nombre}" for _, row in df.iterrows()]
@@ -58,30 +60,33 @@ with col_sel:
     st.session_state.idx_emp = seleccion
 
 with col_nav:
-    c1, c2, c3, c4 = st.columns([1,1,1,1])
+    # Empujar botones a la derecha y muy juntos
+    st.markdown("<div style='text-align:right'>", unsafe_allow_html=True)
+    c1, c2, c3, c4 = st.columns([0.4, 0.4, 0.4, 0.4])
     c1.button("⏮", on_click=ir_primero)
     c2.button("◀", on_click=ir_anterior)
     c3.button("▶", on_click=ir_siguiente)
     c4.button("⏭", on_click=ir_ultimo)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+st.markdown("---")
 
 # --------------------------------------------------
 # EMPLEADO ACTUAL
 # --------------------------------------------------
 emp = df.iloc[st.session_state.idx_emp]
 
-st.markdown("---")
-
 # --------------------------------------------------
 # FICHA VISUAL
 # --------------------------------------------------
-col_foto, col_datos = st.columns([2, 5])
+col_foto, col_datos = st.columns([2, 6])
 
 with col_foto:
     foto = FOTOS_DIR / f"{emp.id_empleado}.jpg"
     if foto.exists():
-        st.image(str(foto), width=140)
+        st.image(str(foto), width=120)
     else:
-        st.image("https://via.placeholder.com/140x140?text=Sin+Foto")
+        st.image("https://via.placeholder.com/120x120?text=Sin+Foto")
 
 with col_datos:
     st.subheader(emp.nombre)
@@ -125,11 +130,13 @@ st.subheader("📑 Exportar varias fichas")
 
 seleccionados = st.multiselect(
     "Selecciona empleados",
-    df["nombre"].tolist()
+    [f"{row.id_empleado} - {row.nombre}" for _, row in df.iterrows()]
 )
 
 if seleccionados and st.button("📄 Generar PDF múltiple"):
-    empleados_sel = df[df["nombre"].isin(seleccionados)].to_dict("records")
+    ids = [int(s.split(" - ")[0]) for s in seleccionados]
+    empleados_sel = df[df["id_empleado"].isin(ids)].to_dict("records")
+
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
         generar_pdf_empleados(
             empleados_sel,
@@ -143,3 +150,4 @@ if seleccionados and st.button("📄 Generar PDF múltiple"):
                 file_name="Fichas_Empleados_PRODE.pdf",
                 mime="application/pdf"
             )
+
