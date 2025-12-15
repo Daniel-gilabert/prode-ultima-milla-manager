@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from pathlib import Path
+import streamlit.components.v1 as components
 
 # -----------------------------------------
 # CONFIGURACIÓN
@@ -154,18 +155,26 @@ with col_datos:
     st.markdown(f"**📍 Ubicación:** {emp['ubicacion']}")
     st.markdown(f"**✅ Estado:** {emp['estado']}")
 
-    # BOTÓN IMPRIMIR
-    st.markdown("""
-    <br>
-    <button onclick="window.print()" style="
-        padding:6px 12px;
-        border-radius:6px;
-        border:1px solid #ccc;
-        cursor:pointer;
-    ">
-    🖨 Imprimir ficha
-    </button>
-    """, unsafe_allow_html=True)
+    # -----------------------------------------
+    # BOTÓN IMPRIMIR (VISTA PREVIA REAL)
+    # -----------------------------------------
+    components.html(
+        """
+        <div style="margin-top:12px;">
+            <button onclick="window.print()" style="
+                padding:6px 14px;
+                border-radius:6px;
+                border:1px solid #ccc;
+                background:#f5f5f5;
+                cursor:pointer;
+                font-size:14px;
+            ">
+                🖨 Imprimir ficha
+            </button>
+        </div>
+        """,
+        height=60
+    )
 
 st.markdown("---")
 
@@ -185,6 +194,8 @@ with st.expander("📌 Servicios"):
 
 with st.expander("📄 Documentación"):
     st.info("Contratos, reconocimientos médicos, certificados, etc.")
+
+
 
 
 
