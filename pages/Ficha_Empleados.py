@@ -145,4 +145,35 @@ st.info("Próximamente: vehículos vinculados al empleado")
 
 st.subheader("📋 Servicios")
 st.info("Próximamente: servicios realizados por el empleado")
+# --------------------------------------------------
+# VEHÍCULOS ASIGNADOS
+# --------------------------------------------------
+st.markdown("---")
+st.subheader("🚗 Vehículos asignados")
+
+vehiculos_file = DATA_DIR / "vehiculos.csv"
+relacion_file = DATA_DIR / "empleado_vehiculo.csv"
+
+if not vehiculos_file.exists() or not relacion_file.exists():
+    st.info("No hay información de vehículos asignados.")
+else:
+    df_veh = pd.read_csv(vehiculos_file, dtype=str)
+    df_rel = pd.read_csv(relacion_file, dtype=str)
+
+    veh_ids = df_rel[df_rel["id_empleado"] == str(emp.id_empleado)]["id_vehiculo"]
+
+    veh_emp = df_veh[df_veh["id_vehiculo"].isin(veh_ids)]
+
+    if veh_emp.empty:
+        st.info("Este empleado no tiene vehículos asignados.")
+    else:
+        for _, v in veh_emp.iterrows():
+            st.markdown(f"""
+🚘 **{v.matricula}** — {v.marca} {v.modelo}  
+• Estado: **{v.estado}**  
+• ITV: {v.itv}  
+• Seguro: {v.seguro}
+""")
+
+
 
