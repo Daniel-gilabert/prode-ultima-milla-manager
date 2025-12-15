@@ -13,7 +13,7 @@ DATA_DIR = Path("data")
 FOTOS_DIR = DATA_DIR / "fotos_empleados"
 CSV_FILE = DATA_DIR / "empleados.csv"
 
-st.title("📇 Ficha de Empleados")
+st.title("🗂️ Ficha de Empleados")
 
 # --------------------------------------------------
 # CARGA DE DATOS
@@ -24,11 +24,15 @@ if not CSV_FILE.exists():
 
 df = pd.read_csv(CSV_FILE, dtype=str).fillna("")
 
-# Normalizar tipos
 df["id_empleado"] = df["id_empleado"].astype(int)
-df["telefono"] = df["telefono"].str.replace(".0", "", regex=False)
 
-# ORDENAR POR ID
+# Limpiar teléfono → SOLO números
+df["telefono"] = (
+    df["telefono"]
+    .str.replace(".0", "", regex=False)
+    .str.replace(" ", "", regex=False)
+)
+
 df = df.sort_values("id_empleado").reset_index(drop=True)
 
 # --------------------------------------------------
@@ -45,12 +49,12 @@ def ir_siguiente(): st.session_state.idx_emp = min(total - 1, st.session_state.i
 def ir_ultimo(): st.session_state.idx_emp = total - 1
 
 # --------------------------------------------------
-# SELECTOR + NAVEGACIÓN
+# SELECTOR + BOTONES (MUY JUNTOS Y A LA DERECHA)
 # --------------------------------------------------
-col_sel, col_nav = st.columns([7, 5])
+col_sel, col_nav = st.columns([8, 4])
 
 with col_sel:
-    opciones = [f"{row.id_empleado} - {row.nombre}" for _, row in df.iterrows()]
+    opciones = [f"{r.id_empleado} - {r.nombre}" for _, r in df.iterrows()]
     seleccion = st.selectbox(
         "Selecciona un empleado",
         range(total),
@@ -60,14 +64,11 @@ with col_sel:
     st.session_state.idx_emp = seleccion
 
 with col_nav:
-    # Empujar botones a la derecha y muy juntos
-    st.markdown("<div style='text-align:right'>", unsafe_allow_html=True)
-    c1, c2, c3, c4 = st.columns([0.4, 0.4, 0.4, 0.4])
-    c1.button("⏮", on_click=ir_primero)
-    c2.button("◀", on_click=ir_anterior)
-    c3.button("▶", on_click=ir_siguiente)
-    c4.button("⏭", on_click=ir_ultimo)
-    st.markdown("</div>", unsafe_allow_html=True)
+    b1, b2, b3, b4 = st.columns([0.2, 0.2, 0.2, 0.2])
+    b1.button("⏮", on_click=ir_primero)
+    b2.button("◀", on_click=ir_anterior)
+    b3.button("▶", on_click=ir_siguiente)
+    b4.button("⏭", on_click=ir_ultimo)
 
 st.markdown("---")
 
@@ -75,6 +76,10 @@ st.markdown("---")
 # EMPLEADO ACTUAL
 # --------------------------------------------------
 emp = df.iloc[st.session_state.idx_emp]
+
+telefono_tel = emp.telefono
+if telefono_tel and not telefono_tel.startswith("34"):
+    telefono_tel = "34" + telefono_tel
 
 # --------------------------------------------------
 # FICHA VISUAL
@@ -84,9 +89,9 @@ col_foto, col_datos = st.columns([2, 6])
 with col_foto:
     foto = FOTOS_DIR / f"{emp.id_empleado}.jpg"
     if foto.exists():
-        st.image(str(foto), width=120)
+        st.image(str(foto), width=110)
     else:
-        st.image("https://via.placeholder.com/120x120?text=Sin+Foto")
+        st.image("https://via.placeholder.com/110x110?text=Sin+Foto")
 
 with col_datos:
     st.subheader(emp.nombre)
@@ -95,7 +100,7 @@ with col_datos:
 🆔 **ID empleado:** {emp.id_empleado}  
 🪪 **DNI:** {emp.dni}  
 ✉ **Email:** <a href="mailto:{emp.email}">{emp.email}</a>  
-📞 **Teléfono:** <a href="tel:{emp.telefono}">{emp.telefono}</a>  
+📞 **Teléfono:** <a href="tel:+{telefono_tel}">{emp.telefono}</a>  
 💼 **Puesto:** {emp.puesto}  
 📍 **Ubicación:** {emp.ubicacion}  
 ✅ **Estado:** {emp.estado}
@@ -104,7 +109,7 @@ with col_datos:
 st.markdown("---")
 
 # --------------------------------------------------
-# PDF INDIVIDUAL
+# EXPORTAR PDF (SOLO ESTA FICHA)
 # --------------------------------------------------
 st.subheader("📄 Exportar ficha")
 
@@ -124,31 +129,19 @@ if st.button("📄 Generar PDF de esta ficha"):
             )
 
 # --------------------------------------------------
-# PDF MÚLTIPLE
+# SECCIONES FUTURAS (YA PREPARADAS)
 # --------------------------------------------------
-st.subheader("📑 Exportar varias fichas")
+st.markdown("---")
+st.subheader("🧰 EPIs del empleado")
+st.info("Próximamente: EPIs asociados a este empleado")
 
-seleccionados = st.multiselect(
-    "Selecciona empleados",
-    [f"{row.id_empleado} - {row.nombre}" for _, row in df.iterrows()]
-)
+st.subheader("🚗 Vehículos asignados")
+st.info("Próximamente: vehículos vinculados al empleado")
 
-if seleccionados and st.button("📄 Generar PDF múltiple"):
-    ids = [int(s.split(" - ")[0]) for s in seleccionados]
-    empleados_sel = df[df["id_empleado"].isin(ids)].to_dict("records")
+st.subheader("📋 Servicios")
+st.info("Próximamente: servicios realizados por el empleado")
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-        generar_pdf_empleados(
-            empleados_sel,
-            FOTOS_DIR,
-            tmp.name
-        )
-        with open(tmp.name, "rb") as f:
-            st.download_button(
-                "⬇ Descargar PDF",
-                f,
-                file_name="Fichas_Empleados_PRODE.pdf",
-                mime="application/pdf"
             )
+
 
 
