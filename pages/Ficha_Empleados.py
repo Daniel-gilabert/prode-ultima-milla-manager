@@ -23,7 +23,8 @@ if not EMP_FILE.exists():
     st.error("No hay empleados cargados.")
     st.stop()
 
-df = pd.read_csv(EMP_FILE, encoding="utf-8-sig")
+df = pd.read_csv(EMP_FILE, encoding="utf-8-sig", dtype={"telefono": str})
+
 
 if df.empty:
     st.warning("No hay empleados para mostrar.")
@@ -138,6 +139,7 @@ with st.expander("📌 Servicios"):
 
 with st.expander("📄 Documentación"):
     st.info("Pendiente de implementar")
+
 
 
 
