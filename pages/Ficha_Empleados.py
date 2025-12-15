@@ -140,8 +140,3 @@ st.info("Próximamente: vehículos vinculados al empleado")
 
 st.subheader("📋 Servicios")
 st.info("Próximamente: servicios realizados por el empleado")
-
-            )
-
-
-
