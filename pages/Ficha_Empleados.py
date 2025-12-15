@@ -100,7 +100,12 @@ with col_datos:
 🆔 **ID empleado:** {emp.id_empleado}  
 🪪 **DNI:** {emp.dni}  
 ✉ **Email:** <a href="mailto:{emp.email}">{emp.email}</a>  
-📞 **Teléfono:** <a href="tel:+{telefono_tel}">{emp.telefono}</a>  
+📞 **Teléfono:** {emp.telefono}
+&nbsp;&nbsp;
+<a href="tel:+{telefono_tel}">📞 Llamar</a>
+&nbsp;&nbsp;
+<a href="https://wa.me/{telefono_tel}" target="_blank">💬 WhatsApp</a>
+
 💼 **Puesto:** {emp.puesto}  
 📍 **Ubicación:** {emp.ubicacion}  
 ✅ **Estado:** {emp.estado}
@@ -140,3 +145,4 @@ st.info("Próximamente: vehículos vinculados al empleado")
 
 st.subheader("📋 Servicios")
 st.info("Próximamente: servicios realizados por el empleado")
+
