@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 
 # --------------------------------------------------
-# CONFIGURACIÓN
+# CONFIG
 # --------------------------------------------------
 st.set_page_config(layout="wide")
 
@@ -14,115 +14,147 @@ FOTOS_EMP = DATA / "fotos_empleados"
 FOTOS_VEH = DATA / "fotos_vehiculos"
 
 # --------------------------------------------------
-# FUNCIONES
+# HELPERS
 # --------------------------------------------------
 def load_json_safe(path):
     if not path.exists():
         return []
     try:
-        contenido = path.read_text(encoding="utf-8").strip()
-        if not contenido:
+        txt = path.read_text(encoding="utf-8").strip()
+        if not txt:
             return []
-        return json.loads(contenido)
+        return json.loads(txt)
     except Exception:
         return []
 
-def limpiar(valor):
-    if valor is None:
+def clean(v):
+    if v is None:
         return ""
-    if isinstance(valor, float):
+    if isinstance(v, float):
         return ""
-    return str(valor)
+    return str(v)
 
 # --------------------------------------------------
-# CARGA DE DATOS
+# LOAD DATA (BLINDADO)
 # --------------------------------------------------
 vehiculos = load_json_safe(VEH_FILE)
 empleados = load_json_safe(EMP_FILE)
 
 if not vehiculos:
     st.warning("⚠️ No hay vehículos cargados en el sistema.")
-    st.info("👉 Cárgalos desde **Administrar Vehículos**.")
+    st.info("👉 Cárgalos una sola vez desde **Administrar Vehículos**.")
     st.stop()
 
-# Indexar empleados por id
-empleados_por_id = {
-    int(e["id_empleado"]): e for e in empleados if str(e.get("id_empleado", "")).isdigit()
-}
-
-# --------------------------------------------------
-# SELECTOR VEHÍCULO
-# --------------------------------------------------
 vehiculos = sorted(vehiculos, key=lambda x: x.get("id_vehiculo", 0))
 
-opciones = {
-    f'{v["id_vehiculo"]} - {v.get("matricula", "")}': v
-    for v in vehiculos
+emp_by_id = {
+    int(e["id_empleado"]): e
+    for e in empleados
+    if str(e.get("id_empleado", "")).isdigit()
 }
 
+# --------------------------------------------------
+# STATE DE NAVEGACIÓN
+# --------------------------------------------------
+if "veh_index" not in st.session_state:
+    st.session_state.veh_index = 0
+
+def ir_primero():
+    st.session_state.veh_index = 0
+
+def ir_anterior():
+    if st.session_state.veh_index > 0:
+        st.session_state.veh_index -= 1
+
+def ir_siguiente():
+    if st.session_state.veh_index < len(vehiculos) - 1:
+        st.session_state.veh_index += 1
+
+def ir_ultimo():
+    st.session_state.veh_index = len(vehiculos) - 1
+
+# --------------------------------------------------
+# SELECTOR + BOTONES
+# --------------------------------------------------
 st.title("🚗 Ficha de Vehículos")
 
-clave = st.selectbox(
-    "Selecciona un vehículo",
-    opciones.keys()
-)
+col_sel, col_btns = st.columns([5, 2])
 
-veh = opciones[clave]
+with col_sel:
+    opciones = [
+        f'{v["id_vehiculo"]} - {v.get("matricula","")}'
+        for v in vehiculos
+    ]
+    seleccion = st.selectbox(
+        "Selecciona un vehículo",
+        opciones,
+        index=st.session_state.veh_index
+    )
+    st.session_state.veh_index = opciones.index(seleccion)
+
+with col_btns:
+    b1, b2, b3, b4 = st.columns(4)
+    with b1:
+        st.button("⏮", on_click=ir_primero)
+    with b2:
+        st.button("⬅", on_click=ir_anterior)
+    with b3:
+        st.button("➡", on_click=ir_siguiente)
+    with b4:
+        st.button("⏭", on_click=ir_ultimo)
+
+veh = vehiculos[st.session_state.veh_index]
 
 # --------------------------------------------------
-# DATOS PRINCIPALES
+# DATA VEHÍCULO
 # --------------------------------------------------
 id_veh = veh.get("id_vehiculo")
-matricula = limpiar(veh.get("matricula"))
-marca = limpiar(veh.get("marca"))
-modelo = limpiar(veh.get("modelo"))
-bastidor = limpiar(veh.get("bastidor"))
-tipo = limpiar(veh.get("tipo")).lower()
-estado = limpiar(veh.get("estado", "OPERATIVO"))
+matricula = clean(veh.get("matricula"))
+marca = clean(veh.get("marca"))
+modelo = clean(veh.get("modelo"))
+bastidor = clean(veh.get("bastidor"))
+tipo = clean(veh.get("tipo")).lower()
+estado = clean(veh.get("estado", "OPERATIVO"))
 id_emp = veh.get("id_empleado")
 
 # --------------------------------------------------
-# EMPLEADO ASIGNADO
+# EMPLEADO
 # --------------------------------------------------
-empleado = empleados_por_id.get(id_emp)
-nombre_emp = empleado["nombre"] if empleado else "No asignado"
+emp = emp_by_id.get(id_emp)
+nombre_emp = emp["nombre"] if emp else "No asignado"
 
-# Foto empleado
 foto_emp = None
-if empleado:
-    posible = FOTOS_EMP / f'{empleado["id_empleado"]}.jpg'
-    if posible.exists():
-        foto_emp = posible
+if emp:
+    f = FOTOS_EMP / f'{emp["id_empleado"]}.jpg'
+    if f.exists():
+        foto_emp = f
 
 # --------------------------------------------------
-# FOTO VEHÍCULO (POR MARCA)
+# FOTO VEHÍCULO
 # --------------------------------------------------
 foto_veh = None
-marca_lower = marca.lower()
-
-if "paxster" in marca_lower:
+m = marca.lower()
+if "paxster" in m:
     foto_veh = FOTOS_VEH / "paxster.jpg"
-elif "scoobic" in marca_lower:
+elif "scoobic" in m:
     foto_veh = FOTOS_VEH / "scoobic.jpg"
-elif "renault" in marca_lower:
+elif "renault" in m:
     foto_veh = FOTOS_VEH / "renault.jpg"
 
 # --------------------------------------------------
-# UI
+# UI PRINCIPAL
 # --------------------------------------------------
 st.markdown("---")
 
-col_foto_emp, col_info, col_foto_veh = st.columns([1.2, 2.2, 1.4])
+c1, c2, c3 = st.columns([1.2, 2.2, 1.6])
 
-# FOTO EMPLEADO
-with col_foto_emp:
+with c1:
     if foto_emp:
         st.image(str(foto_emp), width=160)
     else:
         st.info("Empleado sin foto")
 
-# INFO VEHÍCULO
-with col_info:
+with c2:
     st.subheader(matricula)
     st.caption(f"{marca} {modelo}")
 
@@ -132,18 +164,25 @@ with col_info:
     st.markdown(f"🔩 **Bastidor:** {bastidor or '—'}")
     st.markdown(f"👤 **Asignado a:** {nombre_emp}")
 
-# FOTO VEHÍCULO
-with col_foto_veh:
+with c3:
     if foto_veh and foto_veh.exists():
         st.image(str(foto_veh), use_container_width=True)
     else:
         st.info("Imagen vehículo no disponible")
 
+# --------------------------------------------------
+# BLOQUES FUNCIONALES (YA PREPARADOS)
+# --------------------------------------------------
 st.markdown("---")
 
-# --------------------------------------------------
-# FUTURAS SECCIONES
-# --------------------------------------------------
-st.subheader("📌 Información adicional")
-st.info("Aquí se integrarán: ITV, seguros, averías, multas y documentación.")
+st.subheader("📋 ITV")
+st.info("• Fecha última ITV\n• Próxima ITV\n• Estación ITV\n• Avisos automáticos")
 
+st.subheader("🛡️ Seguro")
+st.info("• Aseguradora\n• Nº póliza\n• Vigencia\n• Documentación")
+
+st.subheader("📂 Documentación")
+st.info("• Ficha técnica\n• Permiso circulación\n• Multas")
+
+st.subheader("🔧 Historial / Averías")
+st.info("• Fecha\n• Descripción\n• Taller\n• Entrada / salida")
