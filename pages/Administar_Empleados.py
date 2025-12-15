@@ -49,7 +49,7 @@ if archivo is not None:
     "puesto",
     "ubicacion",
     "estado",
-    "url_foto",  
+    
 }
 
 
