@@ -1,201 +1,211 @@
 import streamlit as st
 import json
 from pathlib import Path
+from datetime import date
 
-# --------------------------------------------------
-# CONFIGURACIÓN
-# --------------------------------------------------
-st.set_page_config(layout="wide")
+# ----------------------------------
+# CONFIG
+# ----------------------------------
+VEH_FILE = Path("data/vehiculos.json")
+EMP_FILE = Path("data/empleados.json")
+FOTOS_EMP = Path("data/fotos_empleados")
+FOTOS_VEH = Path("data/fotos_vehiculos")
 
-DATA = Path("data")
-VEH_FILE = DATA / "vehiculos.json"
-EMP_FILE = DATA / "empleados.json"
-FOTOS_EMP = DATA / "fotos_empleados"
-FOTOS_VEH = DATA / "fotos_vehiculos"
+st.set_page_config(page_title="Ficha de Vehículos", layout="wide")
 
-# --------------------------------------------------
-# FUNCIONES
-# --------------------------------------------------
-def load_json_safe(path):
+# ----------------------------------
+# HELPERS
+# ----------------------------------
+def load_json(path, default):
     if not path.exists():
-        return []
-    try:
-        txt = path.read_text(encoding="utf-8").strip()
-        if not txt:
-            return []
-        return json.loads(txt)
-    except Exception:
-        return []
+        return default
+    content = path.read_text(encoding="utf-8").strip()
+    if not content:
+        return default
+    return json.loads(content)
 
-def clean(v):
-    if v is None:
-        return ""
-    if isinstance(v, float):
-        return ""
-    return str(v)
+def save_json(path, data):
+    path.write_text(
+        json.dumps(data, indent=2, ensure_ascii=False),
+        encoding="utf-8"
+    )
 
-# --------------------------------------------------
-# CARGA DE DATOS
-# --------------------------------------------------
-vehiculos = load_json_safe(VEH_FILE)
-empleados = load_json_safe(EMP_FILE)
+def foto_empleado(id_emp):
+    if not id_emp:
+        return None
+    for ext in ["jpg", "png", "jpeg"]:
+        f = FOTOS_EMP / f"{id_emp}.{ext}"
+        if f.exists():
+            return f
+    return None
+
+def foto_vehiculo(marca):
+    if not marca:
+        return None
+    marca = marca.lower()
+    if "paxster" in marca:
+        return FOTOS_VEH / "paxster.png"
+    if "scoobic" in marca:
+        return FOTOS_VEH / "scoobic.png"
+    if "renault" in marca:
+        return FOTOS_VEH / "renault.png"
+    return None
+
+# ----------------------------------
+# DATA
+# ----------------------------------
+vehiculos = load_json(VEH_FILE, [])
+empleados = load_json(EMP_FILE, [])
 
 if not vehiculos:
     st.warning("⚠️ No hay vehículos cargados en el sistema.")
-    st.info("👉 Cárgalos una sola vez desde **Administrar Vehículos**.")
     st.stop()
 
 vehiculos = sorted(vehiculos, key=lambda x: x.get("id_vehiculo", 0))
 
-emp_by_id = {
-    int(e["id_empleado"]): e
-    for e in empleados
-    if str(e.get("id_empleado", "")).isdigit()
-}
+# ----------------------------------
+# SESSION STATE
+# ----------------------------------
+if "veh_idx" not in st.session_state:
+    st.session_state.veh_idx = 0
 
-# --------------------------------------------------
-# STATE DE NAVEGACIÓN
-# --------------------------------------------------
-if "veh_index" not in st.session_state:
-    st.session_state.veh_index = 0
-
-def ir_primero():
-    st.session_state.veh_index = 0
-
-def ir_anterior():
-    if st.session_state.veh_index > 0:
-        st.session_state.veh_index -= 1
-
-def ir_siguiente():
-    if st.session_state.veh_index < len(vehiculos) - 1:
-        st.session_state.veh_index += 1
-
-def ir_ultimo():
-    st.session_state.veh_index = len(vehiculos) - 1
-
-# --------------------------------------------------
-# SELECTOR + BOTONES
-# --------------------------------------------------
+# ----------------------------------
+# HEADER
+# ----------------------------------
 st.title("🚗 Ficha de Vehículos")
 
-col_sel, col_btns = st.columns([5, 2])
+labels = [
+    f'{v["id_vehiculo"]} - {v["matricula"]}'
+    for v in vehiculos
+]
 
-with col_sel:
-    opciones = [
-        f'{v["id_vehiculo"]} - {v.get("matricula","")}'
-        for v in vehiculos
-    ]
-    seleccion = st.selectbox(
-        "Selecciona un vehículo",
-        opciones,
-        index=st.session_state.veh_index
-    )
-    st.session_state.veh_index = opciones.index(seleccion)
+sel = st.selectbox(
+    "Selecciona un vehículo",
+    range(len(labels)),
+    format_func=lambda i: labels[i],
+    index=st.session_state.veh_idx
+)
 
-with col_btns:
-    b1, b2, b3, b4 = st.columns(4)
-    with b1:
-        st.button("⏮", on_click=ir_primero)
-    with b2:
-        st.button("⬅", on_click=ir_anterior)
-    with b3:
-        st.button("➡", on_click=ir_siguiente)
-    with b4:
-        st.button("⏭", on_click=ir_ultimo)
+st.session_state.veh_idx = sel
+veh = vehiculos[sel]
 
-veh = vehiculos[st.session_state.veh_index]
+# ----------------------------------
+# NAV BUTTONS
+# ----------------------------------
+c1, c2, c3, c4, _ = st.columns([1, 1, 1, 1, 6])
 
-# --------------------------------------------------
-# DATA VEHÍCULO
-# --------------------------------------------------
-id_veh = veh.get("id_vehiculo")
-matricula = clean(veh.get("matricula"))
-marca = clean(veh.get("marca"))
-modelo = clean(veh.get("modelo"))
-bastidor = clean(veh.get("bastidor"))
-tipo = clean(veh.get("tipo")).lower()
-estado = clean(veh.get("estado", "OPERATIVO"))
-id_emp = veh.get("id_empleado")
+if c1.button("⏮"):
+    st.session_state.veh_idx = 0
+    st.experimental_rerun()
 
-# --------------------------------------------------
-# EMPLEADO
-# --------------------------------------------------
-emp = emp_by_id.get(id_emp)
-nombre_emp = emp["nombre"] if emp else "No asignado"
+if c2.button("◀"):
+    st.session_state.veh_idx = max(0, st.session_state.veh_idx - 1)
+    st.experimental_rerun()
 
-foto_emp = None
-if emp:
-    f = FOTOS_EMP / f'{emp["id_empleado"]}.jpg'
-    if f.exists():
-        foto_emp = f
+if c3.button("▶"):
+    st.session_state.veh_idx = min(len(vehiculos) - 1, st.session_state.veh_idx + 1)
+    st.experimental_rerun()
 
-# --------------------------------------------------
-# FOTO VEHÍCULO
-# --------------------------------------------------
-foto_veh = None
-m = marca.lower()
-if "paxster" in m:
-    foto_veh = FOTOS_VEH / "paxster.jpg"
-elif "scoobic" in m:
-    foto_veh = FOTOS_VEH / "scoobic.jpg"
-elif "renault" in m:
-    foto_veh = FOTOS_VEH / "renault.jpg"
+if c4.button("⏭"):
+    st.session_state.veh_idx = len(vehiculos) - 1
+    st.experimental_rerun()
 
-# --------------------------------------------------
-# UI PRINCIPAL
-# --------------------------------------------------
-st.markdown("---")
+st.divider()
 
-c1, c2, c3 = st.columns([1.2, 2.2, 1.6])
+# ----------------------------------
+# MAIN LAYOUT
+# ----------------------------------
+col_emp, col_info, col_veh = st.columns([2, 4, 3])
 
-with c1:
+# EMPLEADO FOTO
+with col_emp:
+    emp_id = veh.get("id_empleado")
+    foto_emp = foto_empleado(emp_id)
     if foto_emp:
-        st.image(str(foto_emp), width=160)
+        st.image(str(foto_emp), width=180)
     else:
         st.info("Empleado sin foto")
 
-with c2:
-    st.subheader(matricula)
-    st.caption(f"{marca} {modelo}")
+# INFO
+with col_info:
+    st.subheader(veh["matricula"])
+    st.caption(f'{veh.get("marca", "")} {veh.get("modelo", "")}')
 
-    st.markdown(f"🆔 **ID vehículo:** {id_veh}")
-    st.markdown(f"🏷️ **Tipo:** {tipo}")
-    st.markdown(f"⚙️ **Estado:** {estado}")
-    st.markdown(f"🔩 **Bastidor:** {bastidor or '—'}")
-    st.markdown(f"👤 **Asignado a:** {nombre_emp}")
+    st.markdown(f"🆔 **ID vehículo:** {veh['id_vehiculo']}")
+    st.markdown(f"🏷️ **Tipo:** {veh.get('tipo','')}")
+    st.markdown(f"⚙️ **Estado:** {veh.get('estado','OPERATIVO')}")
+    st.markdown(f"🔩 **Bastidor:** {veh.get('bastidor','')}")
 
-with c3:
-    if foto_veh and foto_veh.exists():
-        st.image(str(foto_veh), use_container_width=True)
+    emp_actual = next(
+        (e for e in empleados if e["id_empleado"] == emp_id),
+        None
+    )
+
+    if emp_actual:
+        st.markdown(f"👤 **Asignado a:** {emp_actual['nombre']}")
     else:
-        st.info("Imagen vehículo no disponible")
+        st.markdown("👤 **Asignado a:** No asignado")
 
-# --------------------------------------------------
-# HISTORIAL ASIGNACIONES (oculto por defecto)
-# --------------------------------------------------
-if st.button("Mostrar historial de asignaciones"):
-    st.subheader("📝 Historial de asignaciones")
-    historial = veh.get("historial_asignaciones", [])
-    if not historial:
-        st.info("No hay historial de asignaciones para este vehículo.")
+# VEH FOTO
+with col_veh:
+    fv = foto_vehiculo(veh.get("marca", ""))
+    if fv:
+        st.image(str(fv), use_container_width=True)
+
+st.divider()
+
+# ----------------------------------
+# ASIGNACIÓN
+# ----------------------------------
+st.subheader("🔗 Asignar vehículo")
+
+opciones = ["No asignado"] + [
+    f'{e["id_empleado"]} - {e["nombre"]}'
+    for e in empleados
+]
+
+sel_emp = st.selectbox("Empleado", opciones)
+
+if st.button("💾 Guardar asignación"):
+    hoy = str(date.today())
+
+    # cerrar asignación anterior
+    if veh.get("id_empleado"):
+        veh.setdefault("historial_asignaciones", []).append({
+            "id_empleado": veh["id_empleado"],
+            "fecha_fin": hoy
+        })
+
+    if sel_emp == "No asignado":
+        veh["id_empleado"] = None
     else:
-        for h in historial:
-            st.markdown(f"**Empleado:** {h['empleado_nombre']}")
-            st.markdown(f"**Fecha inicio:** {h['fecha_inicio']}")
-            st.markdown(f"**Fecha fin:** {h['fecha_fin']}")
-            st.markdown("---")
+        id_emp = int(sel_emp.split(" - ")[0])
+        veh["id_empleado"] = id_emp
+        veh.setdefault("historial_asignaciones", []).append({
+            "id_empleado": id_emp,
+            "fecha_inicio": hoy
+        })
 
-# --------------------------------------------------
-# BLOQUES FUNCIONALES (YA PREPARADOS)
-# --------------------------------------------------
-st.markdown("---")
+    save_json(VEH_FILE, vehiculos)
+    st.success("✅ Asignación actualizada")
+    st.experimental_rerun()
 
-st.subheader("📋 ITV")
-st.info("• Fecha última ITV\n• Próxima ITV\n• Estación ITV\n• Avisos automáticos")
+# ----------------------------------
+# HISTORIAL
+# ----------------------------------
+if st.button("📜 Mostrar historial de asignaciones"):
+    hist = veh.get("historial_asignaciones", [])
+    if not hist:
+        st.info("Sin historial")
+    else:
+        for h in hist:
+            emp = next(
+                (e for e in empleados if e["id_empleado"] == h["id_empleado"]),
+                {}
+            )
+            st.markdown(
+                f"👤 **{emp.get('nombre','')}** | "
+                f"{h.get('fecha_inicio','')} → {h.get('fecha_fin','Actual')}"
+            )
 
-st.subheader("🛡️ Seguro")
-st.info("• Aseguradora\n• Nº póliza\n• Vigencia\n• Documentación")
-
-st.subheader("📂 Documentación")
-st.info("• Ficha técnica\n• Permiso circulación\n• Multas")
 
