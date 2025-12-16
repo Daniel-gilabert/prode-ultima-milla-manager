@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 
 # --------------------------------------------------
-# CONFIG
+# CONFIGURACIÓN
 # --------------------------------------------------
 st.set_page_config(layout="wide")
 
@@ -14,7 +14,7 @@ FOTOS_EMP = DATA / "fotos_empleados"
 FOTOS_VEH = DATA / "fotos_vehiculos"
 
 # --------------------------------------------------
-# HELPERS
+# FUNCIONES
 # --------------------------------------------------
 def load_json_safe(path):
     if not path.exists():
@@ -35,7 +35,7 @@ def clean(v):
     return str(v)
 
 # --------------------------------------------------
-# LOAD DATA (BLINDADO)
+# CARGA DE DATOS
 # --------------------------------------------------
 vehiculos = load_json_safe(VEH_FILE)
 empleados = load_json_safe(EMP_FILE)
@@ -171,6 +171,21 @@ with c3:
         st.info("Imagen vehículo no disponible")
 
 # --------------------------------------------------
+# HISTORIAL ASIGNACIONES (oculto por defecto)
+# --------------------------------------------------
+if st.button("Mostrar historial de asignaciones"):
+    st.subheader("📝 Historial de asignaciones")
+    historial = veh.get("historial_asignaciones", [])
+    if not historial:
+        st.info("No hay historial de asignaciones para este vehículo.")
+    else:
+        for h in historial:
+            st.markdown(f"**Empleado:** {h['empleado_nombre']}")
+            st.markdown(f"**Fecha inicio:** {h['fecha_inicio']}")
+            st.markdown(f"**Fecha fin:** {h['fecha_fin']}")
+            st.markdown("---")
+
+# --------------------------------------------------
 # BLOQUES FUNCIONALES (YA PREPARADOS)
 # --------------------------------------------------
 st.markdown("---")
@@ -184,5 +199,3 @@ st.info("• Aseguradora\n• Nº póliza\n• Vigencia\n• Documentación")
 st.subheader("📂 Documentación")
 st.info("• Ficha técnica\n• Permiso circulación\n• Multas")
 
-st.subheader("🔧 Historial / Averías")
-st.info("• Fecha\n• Descripción\n• Taller\n• Entrada / salida")
