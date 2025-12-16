@@ -38,9 +38,16 @@ def clean(v):
     if v is None:
         return ""
     v = str(v).strip()
-    return "" if v.lower() == "nan" else v
+    return "" if v.lower() in ("nan", "none") else v
+
+def safe_int(v):
+    try:
+        return int(v)
+    except Exception:
+        return None
 
 def foto_empleado(emp_id):
+    emp_id = safe_int(emp_id)
     if not emp_id:
         return None
     for ext in (".jpg", ".png", ".jpeg"):
@@ -55,22 +62,35 @@ def foto_vehiculo(marca):
 
     m = marca.lower().strip()
 
+    posibles = []
     if "pax" in m:
-        f = FOTOS_VEH / "paxster.png"
+        posibles = ["paxster.png", "paxster.jpg"]
     elif "scoob" in m:
-        f = FOTOS_VEH / "scoobic.png"
-    elif "renault" in m:
-        f = FOTOS_VEH / "renault.png"
-    else:
-        return None
+        posibles = ["scoobic.png", "scoobic.jpg"]
+    elif "rena" in m:
+        posibles = ["renault.png", "renault.jpg"]
 
-    return f if f.exists() else None
+    for p in posibles:
+        f = FOTOS_VEH / p
+        if f.exists():
+            return f
+
+    return None
 
 # --------------------------------------------------
 # LOAD DATA
 # --------------------------------------------------
 vehiculos = load_json(VEH_FILE)
-empleados = load_json(EMP_FILE)
+empleados_raw = load_json(EMP_FILE)
+
+# Normalizar empleados
+empleados = []
+for e in empleados_raw:
+    emp_id = safe_int(e.get("id_empleado"))
+    nombre = clean(e.get("nombre"))
+    if emp_id and nombre:
+        e["id_empleado"] = emp_id
+        empleados.append(e)
 
 st.title("🚗 Ficha de Vehículos")
 
@@ -78,7 +98,7 @@ if not vehiculos:
     st.warning("No hay vehículos cargados en el sistema.")
     st.stop()
 
-vehiculos = sorted(vehiculos, key=lambda x: x.get("id_vehiculo", 0))
+vehiculos = sorted(vehiculos, key=lambda x: safe_int(x.get("id_vehiculo")) or 0)
 
 # --------------------------------------------------
 # STATE
@@ -121,9 +141,10 @@ with c4:
         st.rerun()
 
 veh = vehiculos[st.session_state.veh_idx]
+veh["id_empleado"] = safe_int(veh.get("id_empleado"))
 
 emp_asignado = next(
-    (e for e in empleados if e.get("id_empleado") == veh.get("id_empleado")),
+    (e for e in empleados if e["id_empleado"] == veh.get("id_empleado")),
     None
 )
 
@@ -133,7 +154,6 @@ emp_asignado = next(
 st.divider()
 left, mid, right = st.columns([3, 4, 5])
 
-# --- FOTO EMPLEADO ---
 with left:
     fe = foto_empleado(veh.get("id_empleado"))
     if fe:
@@ -141,7 +161,6 @@ with left:
     else:
         st.info("Empleado sin foto")
 
-# --- DATOS ---
 with mid:
     st.markdown(
         f"<h1 style='margin-bottom:0'>{clean(veh.get('matricula'))}</h1>",
@@ -156,13 +175,10 @@ with mid:
     st.markdown(f"🏷️ **Tipo:** {clean(veh.get('tipo'))}")
     st.markdown(f"⚙️ **Estado:** {clean(veh.get('estado','OPERATIVO'))}")
     st.markdown(f"🔩 **Bastidor:** {clean(veh.get('bastidor'))}")
+    st.markdown(
+        f"👤 **Asignado a:** {emp_asignado['nombre'] if emp_asignado else 'No asignado'}"
+    )
 
-    if emp_asignado:
-        st.markdown(f"👤 **Asignado a:** {emp_asignado['nombre']}")
-    else:
-        st.markdown("👤 **Asignado a:** No asignado")
-
-# --- FOTO VEHÍCULO ---
 with right:
     fv = foto_vehiculo(veh.get("marca"))
     if fv:
@@ -176,13 +192,8 @@ with right:
 st.divider()
 st.subheader("🔗 Asignar vehículo a empleado")
 
-empleados_validos = [
-    e for e in empleados
-    if e.get("id_empleado") is not None and e.get("nombre")
-]
-
 options = ["— Sin asignar —"] + [
-    f"{e['id_empleado']} - {e['nombre']}" for e in empleados_validos
+    f"{e['id_empleado']} - {e['nombre']}" for e in empleados
 ]
 
 current = "— Sin asignar —"
@@ -213,15 +224,12 @@ if veh.get("historial_asignaciones"):
     with st.expander("📜 Historial de asignaciones"):
         for h in reversed(veh["historial_asignaciones"]):
             emp = next(
-                (e for e in empleados if e.get("id_empleado") == h.get("id_empleado")),
+                (e for e in empleados if e["id_empleado"] == h.get("id_empleado")),
                 None
             )
-            nombre = emp["nombre"] if emp else "Sin asignar"
-            st.write(f"{h['fecha']} → {nombre}")
+            st.write(f"{h['fecha']} → {emp['nombre'] if emp else 'Sin asignar'}")
 
-# --------------------------------------------------
-# FUTURO
-# --------------------------------------------------
 st.divider()
 st.info("Aquí se integrarán ITV, seguros, averías, multas y documentación.")
+
 
