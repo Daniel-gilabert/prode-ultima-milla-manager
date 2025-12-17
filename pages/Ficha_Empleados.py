@@ -1,140 +1,80 @@
 import streamlit as st
-import pandas as pd
+import json
 from pathlib import Path
 
-# -----------------------------------------
-# CONFIGURACIÓN
-# -----------------------------------------
-st.set_page_config(
-    page_title="Ficha de Empleados",
-    layout="wide"
-)
+# ----------------------------------------
+# CONFIG
+# ----------------------------------------
+st.set_page_config(page_title="Ficha de Empleados", layout="wide")
 
-CSV_FILE = Path("data/empleados.csv")
+DATA_PATH = Path("data/empleados.json")
 
-# -----------------------------------------
-# CARGA ROBUSTA DE EMPLEADOS
-# -----------------------------------------
-def cargar_empleados():
-    if not CSV_FILE.exists():
-        return pd.DataFrame()
-
-    # Intentos progresivos: encoding + separador
-    for encoding in ["utf-8-sig", "latin1"]:
-        for sep in [",", ";"]:
-            try:
-                df = pd.read_csv(
-                    CSV_FILE,
-                    dtype=str,
-                    encoding=encoding,
-                    sep=sep,
-                    engine="python"
-                ).fillna("")
-                return df
-            except Exception:
-                pass
-
-    st.error("❌ No se pudo leer empleados.csv. El archivo tiene un formato inválido.")
-    return pd.DataFrame()
-
-df = cargar_empleados()
-
-# -----------------------------------------
-# UI
-# -----------------------------------------
 st.title("🗂️ Ficha de Empleados")
 
-if df.empty:
+# ----------------------------------------
+# CARGA SEGURA DE EMPLEADOS
+# ----------------------------------------
+def cargar_empleados():
+    if not DATA_PATH.exists():
+        return []
+
+    try:
+        contenido = DATA_PATH.read_text(encoding="utf-8").strip()
+        if not contenido or contenido == "[]":
+            return []
+        return json.loads(contenido)
+    except Exception as e:
+        st.error("❌ No se pudo leer empleados.json. El archivo está dañado.")
+        st.exception(e)
+        return []
+
+empleados = cargar_empleados()
+
+# ----------------------------------------
+# SIN EMPLEADOS
+# ----------------------------------------
+if not empleados:
     st.warning("⚠️ No hay empleados cargados en el sistema.")
+    st.info("👉 Ve a **Administrar Empleados** y carga el Excel.")
     st.stop()
 
-# Normalizar columnas (por si vienen con nombres raros)
-df.columns = [c.strip().lower() for c in df.columns]
+# ----------------------------------------
+# SELECTOR
+# ----------------------------------------
+opciones = {
+    f"{e.get('id_empleado')} - {e.get('nombre')}": e
+    for e in empleados
+}
 
-# Columnas esperadas mínimas
-COLUMNAS_MINIMAS = ["id", "nombre"]
-
-for col in COLUMNAS_MINIMAS:
-    if col not in df.columns:
-        st.error(f"❌ Falta la columna obligatoria: {col}")
-        st.stop()
-
-# -----------------------------------------
-# SELECTOR DE EMPLEADO
-# -----------------------------------------
-df = df.sort_values("id")
-
-opciones = [
-    f'{row["id"]} - {row["nombre"]}'
-    for _, row in df.iterrows()
-]
-
-if "empleado_index" not in st.session_state:
-    st.session_state.empleado_index = 0
-
-col_sel, col_prev, col_next = st.columns([8, 1, 1])
-
-with col_sel:
-    seleccionado = st.selectbox(
-        "Selecciona un empleado",
-        opciones,
-        index=st.session_state.empleado_index
-    )
-
-with col_prev:
-    if st.button("◀"):
-        st.session_state.empleado_index = max(
-            0, st.session_state.empleado_index - 1
-        )
-        st.rerun()
-
-with col_next:
-    if st.button("▶"):
-        st.session_state.empleado_index = min(
-            len(opciones) - 1,
-            st.session_state.empleado_index + 1
-        )
-        st.rerun()
-
-st.session_state.empleado_index = opciones.index(seleccionado)
-
-empleado = df.iloc[st.session_state.empleado_index]
-
-# -----------------------------------------
-# FICHA DEL EMPLEADO
-# -----------------------------------------
-st.divider()
-
-col_img, col_info = st.columns([2, 6])
-
-with col_img:
-    foto = Path(f"data/fotos_empleados/{empleado['id']}.jpg")
-    if foto.exists():
-        st.image(str(foto), use_container_width=True)
-    else:
-        st.info("Empleado sin foto")
-
-with col_info:
-    st.markdown(
-        f"""
-        <h2 style="margin-bottom:0">{empleado['nombre']}</h2>
-        <p style="color:gray">ID empleado: {empleado['id']}</p>
-        """,
-        unsafe_allow_html=True
-    )
-
-    for campo in df.columns:
-        if campo in ["id", "nombre"]:
-            continue
-        valor = empleado[campo]
-        if valor:
-            st.markdown(f"**{campo.capitalize()}**: {valor}")
-
-st.divider()
-
-# -----------------------------------------
-# INFO FINAL
-# -----------------------------------------
-st.caption(
-    f"Total empleados cargados en sistema: {len(df)}"
+seleccion = st.selectbox(
+    "Selecciona un empleado",
+    list(opciones.keys())
 )
+
+emp = opciones[seleccion]
+
+# ----------------------------------------
+# FICHA
+# ----------------------------------------
+st.divider()
+
+col1, col2 = st.columns([1, 2])
+
+with col1:
+    st.info("👤 Empleado sin foto")
+
+with col2:
+    st.subheader(emp.get("nombre", ""))
+
+    st.markdown(f"**🆔 ID empleado:** {emp.get('id_empleado','')}")
+    st.markdown(f"**🪪 DNI:** {emp.get('dni','')}")
+    st.markdown(f"**📧 Email:** {emp.get('email','')}")
+    st.markdown(f"**📞 Teléfono:** {emp.get('telefono','')}")
+    st.markdown(f"**💼 Puesto:** {emp.get('puesto','')}")
+    st.markdown(f"**📍 Ubicación:** {emp.get('ubicacion','')}")
+    st.markdown(f"**✅ Estado:** {emp.get('estado','activo')}")
+
+st.divider()
+st.caption("Los vehículos, EPIs, ausencias y documentación se integrarán aquí.")
+
+
