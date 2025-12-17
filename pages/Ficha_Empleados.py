@@ -22,7 +22,11 @@ if not CSV_FILE.exists():
     st.error("❌ No existe empleados.csv")
     st.stop()
 
-df = pd.read_csv(CSV_FILE, dtype=str).fillna("")
+try:
+    df = pd.read_csv(CSV_FILE, dtype=str, encoding="utf-8-sig").fillna("")
+except UnicodeDecodeError:
+    df = pd.read_csv(CSV_FILE, dtype=str, encoding="latin1").fillna("")
+
 
 df["id_empleado"] = df["id_empleado"].astype(int)
 
@@ -174,6 +178,7 @@ else:
 • ITV: {v.itv}  
 • Seguro: {v.seguro}
 """)
+
 
 
 
