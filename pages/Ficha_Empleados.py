@@ -80,6 +80,9 @@ emp_id = emp["id_empleado"]
 # FICHA BÁSICA
 # --------------------------------------------------
 st.divider()
+
+col_foto, col_info = st.columns([1, 3])
+
 with col_foto:
     foto = foto_empleado(emp_id)
     if foto:
@@ -90,7 +93,6 @@ with col_foto:
         )
     else:
         st.info("Empleado sin foto")
-
 
 with col_info:
     st.subheader(emp.get("nombre", ""))
@@ -187,6 +189,7 @@ st.divider()
 st.info(
     "Aquí se integrarán próximamente: formación PRL, reconocimientos médicos y documentación."
 )
+
 
 
 
