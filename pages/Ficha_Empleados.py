@@ -1,7 +1,7 @@
 import streamlit as st
 import json
 from pathlib import Path
-from datetime import date
+from datetime import date, datetime
 
 # --------------------------------------------------
 # CONFIG
@@ -11,9 +11,11 @@ st.set_page_config(page_title="Ficha de Empleados", layout="wide")
 DATA_DIR = Path("data")
 EMP_FILE = DATA_DIR / "empleados.json"
 EPI_FILE = DATA_DIR / "epis.json"
-FOTOS_EMP = DATA_DIR / "fotos_empleados"
+PRL_FILE = DATA_DIR / "prl.json"
 
-# EPIs obligatorios (base)
+FOTOS_EMP = DATA_DIR / "fotos_empleados"
+DOCS_PRL = DATA_DIR / "documentos_prl"
+
 EPIS_OBLIGATORIOS = [
     "Pantalón largo",
     "Camiseta",
@@ -51,16 +53,14 @@ def foto_empleado(emp_id):
 # --------------------------------------------------
 empleados = load_json(EMP_FILE)
 epis = load_json(EPI_FILE)
+prl = load_json(PRL_FILE)
 
 st.title("🗂️ Ficha de Empleados")
 
 if not empleados:
-    st.warning("⚠️ No hay empleados cargados en el sistema.")
+    st.warning("⚠️ No hay empleados cargados.")
     st.stop()
 
-# --------------------------------------------------
-# SELECTOR DE EMPLEADO
-# --------------------------------------------------
 empleados = sorted(empleados, key=lambda e: int(e.get("id_empleado", 0)))
 
 opciones = {
@@ -68,11 +68,7 @@ opciones = {
     for e in empleados
 }
 
-seleccion = st.selectbox(
-    "Selecciona un empleado",
-    list(opciones.keys())
-)
-
+seleccion = st.selectbox("Selecciona un empleado", list(opciones.keys()))
 emp = opciones[seleccion]
 emp_id = emp["id_empleado"]
 
@@ -80,23 +76,18 @@ emp_id = emp["id_empleado"]
 # FICHA BÁSICA
 # --------------------------------------------------
 st.divider()
-
 col_foto, col_info = st.columns([1, 3])
 
 with col_foto:
     foto = foto_empleado(emp_id)
     if foto:
-        st.image(
-            str(foto),
-            width=130,          # tamaño carnet
-            caption="Foto empleado"
-        )
+        st.image(str(foto), width=130)
     else:
         st.info("Empleado sin foto")
 
 with col_info:
     st.subheader(emp.get("nombre", ""))
-    st.markdown(f"**🆔 ID empleado:** {emp_id}")
+    st.markdown(f"**🆔 ID:** {emp_id}")
     st.markdown(f"**🪪 DNI:** {emp.get('dni','')}")
     st.markdown(f"**📧 Email:** {emp.get('email','')}")
     st.markdown(f"**📞 Teléfono:** {emp.get('telefono','')}")
@@ -105,92 +96,114 @@ with col_info:
     st.markdown(f"**✅ Estado:** {emp.get('estado','activo')}")
 
 # --------------------------------------------------
-# EPIs DEL EMPLEADO
+# EPIs
 # --------------------------------------------------
 st.divider()
-st.header("🦺 EPIs (Prevención de Riesgos Laborales)")
+st.header("🦺 EPIs")
 
-# EPIs entregados a este empleado
-epis_emp = [e for e in epis if e.get("id_empleado") == emp_id]
-
+epis_emp = [e for e in epis if e["id_empleado"] == emp_id]
 tipos_entregados = [e["tipo"] for e in epis_emp]
+pendientes = [e for e in EPIS_OBLIGATORIOS if e not in tipos_entregados]
 
-# EPIs pendientes
-epis_pendientes = [
-    epi for epi in EPIS_OBLIGATORIOS
-    if epi not in tipos_entregados
-]
-
-# ---- Estado general
-col_ok, col_bad = st.columns(2)
-
-with col_ok:
-    st.success(f"EPIs entregados: {len(tipos_entregados)}")
-
-with col_bad:
-    st.warning(f"EPIs pendientes: {len(epis_pendientes)}")
-
-# ---- Listados
 col1, col2 = st.columns(2)
 
 with col1:
-    st.subheader("✅ EPIs entregados")
-    if not epis_emp:
-        st.info("No hay EPIs registrados.")
-    else:
-        for e in epis_emp:
-            st.markdown(
-                f"- **{e['tipo']}** | {e['fecha_entrega']} | {e.get('observaciones','')}"
-            )
+    st.subheader("Entregados")
+    for e in epis_emp:
+        st.markdown(f"- **{e['tipo']}** | {e['fecha_entrega']}")
 
 with col2:
-    st.subheader("❌ EPIs pendientes")
-    if not epis_pendientes:
-        st.success("Todos los EPIs obligatorios están entregados.")
+    st.subheader("Pendientes")
+    if not pendientes:
+        st.success("Todos entregados")
     else:
-        for p in epis_pendientes:
+        for p in pendientes:
             st.markdown(f"- {p}")
 
+with st.form("nuevo_epi"):
+    st.subheader("➕ Registrar EPI")
+    tipo = st.selectbox("Tipo", EPIS_OBLIGATORIOS)
+    fecha = st.date_input("Fecha", value=date.today())
+    obs = st.text_input("Observaciones")
+    if st.form_submit_button("Guardar EPI"):
+        epis.append({
+            "id_epi": len(epis) + 1,
+            "id_empleado": emp_id,
+            "tipo": tipo,
+            "fecha_entrega": str(fecha),
+            "observaciones": obs
+        })
+        save_json(EPI_FILE, epis)
+        st.success("EPI registrado")
+        st.rerun()
+
 # --------------------------------------------------
-# REGISTRAR NUEVA ENTREGA DE EPI
+# FORMACIÓN PRL
 # --------------------------------------------------
 st.divider()
-st.subheader("➕ Registrar nueva entrega de EPI")
+st.header("🎓 Formación PRL")
 
-with st.form("form_epi"):
-    tipo = st.selectbox(
-        "Tipo de EPI",
-        EPIS_OBLIGATORIOS
-    )
-    fecha = st.date_input("Fecha de entrega", value=date.today())
+prl_emp = [c for c in prl if c["id_empleado"] == emp_id]
+hoy = date.today()
+
+if not prl_emp:
+    st.info("No hay cursos PRL registrados.")
+else:
+    for c in prl_emp:
+        estado = "✅ Vigente"
+        if c["caduca"]:
+            cad = datetime.fromisoformat(c["fecha_caducidad"]).date()
+            if cad < hoy:
+                estado = "❌ Caducado"
+            elif (cad - hoy).days <= 30:
+                estado = "⚠️ Próximo a caducar"
+
+        st.markdown(
+            f"- **{c['curso']}** | {c['fecha']} | {estado}"
+        )
+
+        if c.get("documento"):
+            st.caption(f"📎 {c['documento']}")
+
+# ---- Registrar curso PRL
+with st.form("nuevo_prl"):
+    st.subheader("➕ Registrar curso PRL")
+
+    curso = st.text_input("Curso")
+    fecha = st.date_input("Fecha realización", value=date.today())
+    caduca = st.checkbox("¿Caduca?")
+    fecha_cad = None
+    if caduca:
+        fecha_cad = st.date_input("Fecha de caducidad")
+
+    doc = st.file_uploader("Certificado (PDF)", type=["pdf"])
     obs = st.text_input("Observaciones")
 
-    guardar = st.form_submit_button("Guardar entrega")
+    if st.form_submit_button("Guardar curso PRL"):
+        nombre_doc = ""
+        if doc:
+            ruta = DOCS_PRL / str(emp_id)
+            ruta.mkdir(parents=True, exist_ok=True)
+            nombre_doc = doc.name
+            (ruta / nombre_doc).write_bytes(doc.read())
 
-if guardar:
-    nuevo = {
-        "id_epi": len(epis) + 1,
-        "id_empleado": emp_id,
-        "tipo": tipo,
-        "fecha_entrega": str(fecha),
-        "observaciones": obs
-    }
-
-    epis.append(nuevo)
-    save_json(EPI_FILE, epis)
-
-    st.success("EPI registrado correctamente")
-    st.rerun()
+        prl.append({
+            "id_prl": len(prl) + 1,
+            "id_empleado": emp_id,
+            "curso": curso,
+            "fecha": str(fecha),
+            "caduca": caduca,
+            "fecha_caducidad": str(fecha_cad) if caduca else "",
+            "documento": nombre_doc,
+            "observaciones": obs
+        })
+        save_json(PRL_FILE, prl)
+        st.success("Curso PRL registrado")
+        st.rerun()
 
 # --------------------------------------------------
-# FUTURO
+# SIGUIENTE
 # --------------------------------------------------
 st.divider()
-st.info(
-    "Aquí se integrarán próximamente: formación PRL, reconocimientos médicos y documentación."
-)
-
-
-
-
+st.info("Siguiente paso: Reconocimientos médicos del empleado")
 
