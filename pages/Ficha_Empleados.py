@@ -278,6 +278,68 @@ with st.form("nuevo_medico"):
         save_json(MED_FILE, medicos)
         st.success("Reconocimiento médico registrado")
         st.rerun()
+        # --------------------------------------------------
+# DOCUMENTACIÓN DEL EMPLEADO
+# --------------------------------------------------
+DOC_FILE = DATA_DIR / "documentos.json"
+DOCS_EMP = DATA_DIR / "documentos_empleados"
+
+documentos = load_json(DOC_FILE)
+
+st.divider()
+st.header("📎 Documentación del empleado")
+
+docs_emp = [d for d in documentos if d["id_empleado"] == emp_id]
+
+if not docs_emp:
+    st.info("No hay documentación registrada para este empleado.")
+else:
+    for d in docs_emp:
+        st.markdown(
+            f"- **{d['tipo']}** | {d['nombre']} | {d['fecha']}"
+        )
+        if d.get("archivo"):
+            st.caption(f"📄 {d['archivo']}")
+
+# ---- Subir nuevo documento
+with st.form("nuevo_documento"):
+    st.subheader("➕ Añadir documento")
+
+    tipo = st.selectbox(
+        "Tipo de documento",
+        ["Contrato", "Certificado", "Anexo", "Sanción", "Otro"]
+    )
+    nombre = st.text_input("Nombre / descripción")
+    fecha = st.date_input("Fecha", value=date.today())
+    archivo = st.file_uploader(
+        "Archivo",
+        type=["pdf", "doc", "docx", "jpg", "png"]
+    )
+    obs = st.text_input("Observaciones")
+
+    if st.form_submit_button("Guardar documento"):
+        nombre_archivo = ""
+        if archivo:
+            ruta = DOCS_EMP / str(emp_id)
+            ruta.mkdir(parents=True, exist_ok=True)
+            nombre_archivo = archivo.name
+            (ruta / nombre_archivo).write_bytes(archivo.read())
+
+        documentos.append({
+            "id_documento": len(documentos) + 1,
+            "id_empleado": emp_id,
+            "tipo": tipo,
+            "nombre": nombre,
+            "fecha": str(fecha),
+            "archivo": nombre_archivo,
+            "observaciones": obs
+        })
+
+        save_json(DOC_FILE, documentos)
+        st.success("Documento guardado correctamente")
+        st.rerun()
+
+
 
 
 
