@@ -1,142 +1,145 @@
-# pages/9_Dashboard.py
-
 import streamlit as st
-import pandas as pd
+import json
 from pathlib import Path
-from datetime import date
+from datetime import date, datetime
 
-# --------------------------------------------------
-# CONFIGURACIÓN DE PÁGINA
-# --------------------------------------------------
-st.set_page_config(
-    page_title="Dashboard — PRODE Última Milla",
-    layout="wide"
-)
+# -----------------------------------------
+# CONFIG
+# -----------------------------------------
+st.set_page_config(page_title="Dashboard", layout="wide")
 
-st.title("Dashboard General — PRODE Última Milla Manager")
-st.markdown("---")
+DATA_DIR = Path("data")
 
-# --------------------------------------------------
-# RUTAS
-# --------------------------------------------------
-BASE = Path.cwd()
-DATA = BASE / "data"
+EMP_FILE = DATA_DIR / "empleados.json"
+EPI_FILE = DATA_DIR / "epis.json"
+PRL_FILE = DATA_DIR / "prl.json"
+MED_FILE = DATA_DIR / "medicos.json"
 
-EMP_FILE = DATA / "empleados.csv"
-SERV_FILE = DATA / "servicios.csv"
-VEH_FILE = DATA / "vehiculos.csv"
-EPI_FILE = DATA / "epis.csv"
+EPIS_OBLIGATORIOS = [
+    "Pantalón largo",
+    "Camiseta",
+    "Calzado de seguridad",
+    "Chaleco reflectante",
+    "Chubasquero",
+]
 
-# --------------------------------------------------
-# FUNCIÓN SEGURA DE CARGA
-# --------------------------------------------------
-def load_csv(path):
-    if path.exists():
-        try:
-            return pd.read_csv(path, encoding="utf-8-sig")
-        except:
-            return pd.DataFrame()
-    return pd.DataFrame()
+# -----------------------------------------
+# HELPERS
+# -----------------------------------------
+def load_json(path):
+    if not path.exists():
+        return []
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return []
 
-# --------------------------------------------------
-# CARGA DE DATOS
-# --------------------------------------------------
-empleados = load_csv(EMP_FILE)
-servicios = load_csv(SERV_FILE)
-vehiculos = load_csv(VEH_FILE)
-epis = load_csv(EPI_FILE)
+# -----------------------------------------
+# LOAD DATA
+# -----------------------------------------
+empleados = load_json(EMP_FILE)
+epis = load_json(EPI_FILE)
+prl = load_json(PRL_FILE)
+medicos = load_json(MED_FILE)
 
-# --------------------------------------------------
-# CÁLCULOS
-# --------------------------------------------------
-total_emp = len(empleados)
+st.title("📊 Dashboard General")
 
-if not empleados.empty and "estado" in empleados.columns:
-    emp_activos = len(empleados[empleados["estado"].str.lower() == "activo"])
-    emp_baja = total_emp - emp_activos
+if not empleados:
+    st.warning("No hay empleados cargados.")
+    st.stop()
+
+hoy = date.today()
+
+# -----------------------------------------
+# EPIs INCOMPLETOS
+# -----------------------------------------
+empleados_epi_incompleto = []
+
+for emp in empleados:
+    emp_id = emp["id_empleado"]
+    entregados = [e["tipo"] for e in epis if e["id_empleado"] == emp_id]
+    faltan = [e for e in EPIS_OBLIGATORIOS if e not in entregados]
+    if faltan:
+        empleados_epi_incompleto.append((emp, faltan))
+
+# -----------------------------------------
+# PRL CADUCADA / PRÓXIMA
+# -----------------------------------------
+empleados_prl_alerta = []
+
+for c in prl:
+    if c["caduca"] and c["fecha_caducidad"]:
+        cad = datetime.fromisoformat(c["fecha_caducidad"]).date()
+        if cad < hoy or (cad - hoy).days <= 30:
+            empleados_prl_alerta.append(c)
+
+# -----------------------------------------
+# MÉDICOS CADUCADOS / PRÓXIMOS
+# -----------------------------------------
+empleados_med_alerta = []
+
+for m in medicos:
+    if m["fecha_caducidad"]:
+        cad = datetime.fromisoformat(m["fecha_caducidad"]).date()
+        if cad < hoy or (cad - hoy).days <= 30:
+            empleados_med_alerta.append(m)
+
+# -----------------------------------------
+# MÉTRICAS
+# -----------------------------------------
+col1, col2, col3, col4 = st.columns(4)
+
+with col1:
+    st.metric("👥 Empleados", len(empleados))
+
+with col2:
+    st.metric("🦺 EPIs incompletos", len(empleados_epi_incompleto))
+
+with col3:
+    st.metric("🎓 PRL en alerta", len(empleados_prl_alerta))
+
+with col4:
+    st.metric("🩺 Médicos en alerta", len(empleados_med_alerta))
+
+# -----------------------------------------
+# DETALLES
+# -----------------------------------------
+st.divider()
+
+st.subheader("🦺 Empleados con EPIs incompletos")
+if not empleados_epi_incompleto:
+    st.success("Todos los empleados tienen EPIs completos.")
 else:
-    emp_activos = 0
-    emp_baja = 0
+    for emp, faltan in empleados_epi_incompleto:
+        st.warning(
+            f"**{emp['nombre']}** → faltan: {', '.join(faltan)}"
+        )
 
-if not servicios.empty and "estado" in servicios.columns:
-    serv_activos = len(servicios[servicios["estado"].str.lower() == "activo"])
-    serv_fin = len(servicios) - serv_activos
+st.divider()
+
+st.subheader("🎓 Formación PRL caducada o próxima")
+if not empleados_prl_alerta:
+    st.success("No hay PRL en alerta.")
 else:
-    serv_activos = 0
-    serv_fin = 0
+    for c in empleados_prl_alerta:
+        emp = next(e for e in empleados if e["id_empleado"] == c["id_empleado"])
+        st.warning(
+            f"**{emp['nombre']}** | {c['curso']} | Caduca: {c['fecha_caducidad']}"
+        )
 
-if not vehiculos.empty and "estado" in vehiculos.columns:
-    veh_operativos = len(vehiculos[vehiculos["estado"].str.lower() != "taller"])
-    veh_taller = len(vehiculos) - veh_operativos
+st.divider()
+
+st.subheader("🩺 Reconocimientos médicos caducados o próximos")
+if not empleados_med_alerta:
+    st.success("No hay reconocimientos médicos en alerta.")
 else:
-    veh_operativos = 0
-    veh_taller = 0
+    for m in empleados_med_alerta:
+        emp = next(e for e in empleados if e["id_empleado"] == m["id_empleado"])
+        st.error(
+            f"**{emp['nombre']}** | Resultado: {m['resultado']} | Caduca: {m['fecha_caducidad']}"
+        )
 
-epi_pendientes = 0
-if not epis.empty and "estado" in epis.columns:
-    epi_pendientes = len(epis[epis["estado"].str.lower() != "entregado"])
-
-# --------------------------------------------------
-# TARJETAS SUPERIORES
-# --------------------------------------------------
-c1, c2, c3, c4 = st.columns(4)
-
-with c1:
-    st.subheader("Empleados")
-    st.metric("Activos", emp_activos)
-    st.metric("De baja", emp_baja)
-
-with c2:
-    st.subheader("Servicios")
-    st.metric("Activos", serv_activos)
-    st.metric("Finalizados", serv_fin)
-
-with c3:
-    st.subheader("Vehículos")
-    st.metric("Operativos", veh_operativos)
-    st.metric("En taller", veh_taller)
-
-with c4:
-    st.subheader("EPIs")
-    st.metric("Pendientes", epi_pendientes)
-
-st.markdown("---")
-
-# --------------------------------------------------
-# SECCIÓN ESTADO GENERAL
-# --------------------------------------------------
-st.header("Estado general del sistema")
-
-if emp_activos == 0:
-    st.warning("No hay empleados activos registrados.")
-else:
-    st.success("Sistema operativo con empleados activos.")
-
-if serv_activos == 0:
-    st.info("No hay servicios activos en este momento.")
-
-if veh_operativos == 0:
-    st.warning("No hay vehículos operativos registrados.")
-
-# --------------------------------------------------
-# SECCIÓN RESUMEN
-# --------------------------------------------------
-st.header("Resumen rápido")
-
-st.write("Total empleados:", total_emp)
-st.write("Total servicios:", len(servicios))
-st.write("Total vehículos:", len(vehiculos))
-st.write("Total EPIs:", len(epis))
-
-st.markdown("---")
-
-# --------------------------------------------------
-# DEBUG CONTROLADO (PUEDES QUITARLO CUANDO QUIERAS)
-# --------------------------------------------------
-with st.expander("Ver información técnica"):
-    st.write("Archivo empleados:", EMP_FILE.exists())
-    st.write("Archivo servicios:", SERV_FILE.exists())
-    st.write("Archivo vehículos:", VEH_FILE.exists())
-    st.write("Archivo EPIs:", EPI_FILE.exists())
+st.divider()
+st.caption("Dashboard de control — PRODE Última Milla Manager")
 
 
