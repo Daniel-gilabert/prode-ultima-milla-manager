@@ -12,10 +12,15 @@ DATA_DIR = Path("data")
 EMP_FILE = DATA_DIR / "empleados.json"
 EPI_FILE = DATA_DIR / "epis.json"
 PRL_FILE = DATA_DIR / "prl.json"
+MED_FILE = DATA_DIR / "medicos.json"
+DOC_FILE = DATA_DIR / "documentos.json"
 
 FOTOS_EMP = DATA_DIR / "fotos_empleados"
 DOCS_PRL = DATA_DIR / "documentos_prl"
+DOCS_MED = DATA_DIR / "documentos_medicos"
+DOCS_EMP = DATA_DIR / "documentos_empleados"
 
+# EPIs obligatorios
 EPIS_OBLIGATORIOS = [
     "Pantalón largo",
     "Camiseta",
@@ -23,6 +28,11 @@ EPIS_OBLIGATORIOS = [
     "Chaleco reflectante",
     "Chubasquero",
 ]
+
+# --------------------------------------------------
+# CONTROL DE ROL
+# --------------------------------------------------
+ES_ADMIN = st.session_state.get("rol") == "admin"
 
 # --------------------------------------------------
 # HELPERS
@@ -54,6 +64,8 @@ def foto_empleado(emp_id):
 empleados = load_json(EMP_FILE)
 epis = load_json(EPI_FILE)
 prl = load_json(PRL_FILE)
+medicos = load_json(MED_FILE)
+documentos = load_json(DOC_FILE)
 
 st.title("🗂️ Ficha de Empleados")
 
@@ -102,40 +114,46 @@ st.divider()
 st.header("🦺 EPIs")
 
 epis_emp = [e for e in epis if e["id_empleado"] == emp_id]
-tipos_entregados = [e["tipo"] for e in epis_emp]
-pendientes = [e for e in EPIS_OBLIGATORIOS if e not in tipos_entregados]
+entregados = [e["tipo"] for e in epis_emp]
+pendientes = [e for e in EPIS_OBLIGATORIOS if e not in entregados]
 
 col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("Entregados")
-    for e in epis_emp:
-        st.markdown(f"- **{e['tipo']}** | {e['fecha_entrega']}")
+    if not epis_emp:
+        st.info("No hay EPIs registrados.")
+    else:
+        for e in epis_emp:
+            st.markdown(f"- **{e['tipo']}** | {e['fecha_entrega']}")
 
 with col2:
     st.subheader("Pendientes")
     if not pendientes:
-        st.success("Todos entregados")
+        st.success("Todos los EPIs entregados")
     else:
         for p in pendientes:
             st.markdown(f"- {p}")
 
-with st.form("nuevo_epi"):
-    st.subheader("➕ Registrar EPI")
-    tipo = st.selectbox("Tipo", EPIS_OBLIGATORIOS)
-    fecha = st.date_input("Fecha", value=date.today())
-    obs = st.text_input("Observaciones")
-    if st.form_submit_button("Guardar EPI"):
-        epis.append({
-            "id_epi": len(epis) + 1,
-            "id_empleado": emp_id,
-            "tipo": tipo,
-            "fecha_entrega": str(fecha),
-            "observaciones": obs
-        })
-        save_json(EPI_FILE, epis)
-        st.success("EPI registrado")
-        st.rerun()
+if ES_ADMIN:
+    with st.form("nuevo_epi"):
+        st.subheader("➕ Registrar EPI")
+        tipo = st.selectbox("Tipo", EPIS_OBLIGATORIOS)
+        fecha = st.date_input("Fecha", value=date.today())
+        obs = st.text_input("Observaciones")
+        if st.form_submit_button("Guardar EPI"):
+            epis.append({
+                "id_epi": len(epis) + 1,
+                "id_empleado": emp_id,
+                "tipo": tipo,
+                "fecha_entrega": str(fecha),
+                "observaciones": obs
+            })
+            save_json(EPI_FILE, epis)
+            st.success("EPI registrado")
+            st.rerun()
+else:
+    st.info("🔒 Solo el administrador puede registrar EPIs")
 
 # --------------------------------------------------
 # FORMACIÓN PRL
@@ -151,77 +169,56 @@ if not prl_emp:
 else:
     for c in prl_emp:
         estado = "✅ Vigente"
-        if c["caduca"]:
+        if c["caduca"] and c["fecha_caducidad"]:
             cad = datetime.fromisoformat(c["fecha_caducidad"]).date()
             if cad < hoy:
                 estado = "❌ Caducado"
             elif (cad - hoy).days <= 30:
                 estado = "⚠️ Próximo a caducar"
+        st.markdown(f"- **{c['curso']}** | {c['fecha']} | {estado}")
 
-        st.markdown(
-            f"- **{c['curso']}** | {c['fecha']} | {estado}"
-        )
+if ES_ADMIN:
+    with st.form("nuevo_prl"):
+        st.subheader("➕ Registrar curso PRL")
+        curso = st.text_input("Curso")
+        fecha = st.date_input("Fecha realización", value=date.today())
+        caduca = st.checkbox("¿Caduca?")
+        fecha_cad = st.date_input("Fecha caducidad") if caduca else None
+        doc = st.file_uploader("Certificado (PDF)", type=["pdf"])
+        obs = st.text_input("Observaciones")
+        if st.form_submit_button("Guardar curso PRL"):
+            nombre_doc = ""
+            if doc:
+                ruta = DOCS_PRL / str(emp_id)
+                ruta.mkdir(parents=True, exist_ok=True)
+                nombre_doc = doc.name
+                (ruta / nombre_doc).write_bytes(doc.read())
+            prl.append({
+                "id_prl": len(prl) + 1,
+                "id_empleado": emp_id,
+                "curso": curso,
+                "fecha": str(fecha),
+                "caduca": caduca,
+                "fecha_caducidad": str(fecha_cad) if caduca else "",
+                "documento": nombre_doc,
+                "observaciones": obs
+            })
+            save_json(PRL_FILE, prl)
+            st.success("Curso PRL registrado")
+            st.rerun()
+else:
+    st.info("🔒 Solo el administrador puede registrar formación PRL")
 
-        if c.get("documento"):
-            st.caption(f"📎 {c['documento']}")
-
-# ---- Registrar curso PRL
-with st.form("nuevo_prl"):
-    st.subheader("➕ Registrar curso PRL")
-
-    curso = st.text_input("Curso")
-    fecha = st.date_input("Fecha realización", value=date.today())
-    caduca = st.checkbox("¿Caduca?")
-    fecha_cad = None
-    if caduca:
-        fecha_cad = st.date_input("Fecha de caducidad")
-
-    doc = st.file_uploader("Certificado (PDF)", type=["pdf"])
-    obs = st.text_input("Observaciones")
-
-    if st.form_submit_button("Guardar curso PRL"):
-        nombre_doc = ""
-        if doc:
-            ruta = DOCS_PRL / str(emp_id)
-            ruta.mkdir(parents=True, exist_ok=True)
-            nombre_doc = doc.name
-            (ruta / nombre_doc).write_bytes(doc.read())
-
-        prl.append({
-            "id_prl": len(prl) + 1,
-            "id_empleado": emp_id,
-            "curso": curso,
-            "fecha": str(fecha),
-            "caduca": caduca,
-            "fecha_caducidad": str(fecha_cad) if caduca else "",
-            "documento": nombre_doc,
-            "observaciones": obs
-        })
-        save_json(PRL_FILE, prl)
-        st.success("Curso PRL registrado")
-        st.rerun()
-
-# --------------------------------------------------
-# SIGUIENTE
-# --------------------------------------------------
-st.divider()
-st.info("Siguiente paso: Reconocimientos médicos del empleado")
 # --------------------------------------------------
 # RECONOCIMIENTOS MÉDICOS
 # --------------------------------------------------
-MED_FILE = DATA_DIR / "medicos.json"
-DOCS_MED = DATA_DIR / "documentos_medicos"
-
-medicos = load_json(MED_FILE)
-
 st.divider()
 st.header("🩺 Reconocimientos médicos")
 
 med_emp = [m for m in medicos if m["id_empleado"] == emp_id]
-hoy = date.today()
 
 if not med_emp:
-    st.info("No hay reconocimientos médicos registrados.")
+    st.info("No hay reconocimientos médicos.")
 else:
     for m in med_emp:
         estado = "✅ Vigente"
@@ -231,115 +228,81 @@ else:
                 estado = "❌ Caducado"
             elif (cad - hoy).days <= 30:
                 estado = "⚠️ Próximo a caducar"
+        st.markdown(f"- **{m['fecha']}** | {m['resultado']} | {estado}")
 
-        st.markdown(
-            f"- **{m['fecha']}** | {m['resultado']} | {estado}"
-        )
+if ES_ADMIN:
+    with st.form("nuevo_medico"):
+        st.subheader("➕ Registrar reconocimiento médico")
+        fecha = st.date_input("Fecha", value=date.today())
+        resultado = st.selectbox("Resultado", ["Apto", "Apto con limitaciones", "No apto"])
+        caduca = st.checkbox("¿Tiene caducidad?")
+        fecha_cad = st.date_input("Fecha caducidad") if caduca else None
+        doc = st.file_uploader("Informe médico (PDF)", type=["pdf"])
+        obs = st.text_input("Observaciones")
+        if st.form_submit_button("Guardar reconocimiento"):
+            nombre_doc = ""
+            if doc:
+                ruta = DOCS_MED / str(emp_id)
+                ruta.mkdir(parents=True, exist_ok=True)
+                nombre_doc = doc.name
+                (ruta / nombre_doc).write_bytes(doc.read())
+            medicos.append({
+                "id_medico": len(medicos) + 1,
+                "id_empleado": emp_id,
+                "fecha": str(fecha),
+                "resultado": resultado,
+                "fecha_caducidad": str(fecha_cad) if caduca else "",
+                "documento": nombre_doc,
+                "observaciones": obs
+            })
+            save_json(MED_FILE, medicos)
+            st.success("Reconocimiento médico registrado")
+            st.rerun()
+else:
+    st.info("🔒 Solo el administrador puede registrar reconocimientos médicos")
 
-        if m.get("documento"):
-            st.caption(f"📎 {m['documento']}")
-
-# ---- Registrar reconocimiento médico
-with st.form("nuevo_medico"):
-    st.subheader("➕ Registrar reconocimiento médico")
-
-    fecha = st.date_input("Fecha reconocimiento", value=date.today())
-    resultado = st.selectbox(
-        "Resultado",
-        ["Apto", "Apto con limitaciones", "No apto"]
-    )
-
-    caduca = st.checkbox("¿Tiene caducidad?")
-    fecha_cad = None
-    if caduca:
-        fecha_cad = st.date_input("Fecha de caducidad")
-
-    doc = st.file_uploader("Informe médico (PDF)", type=["pdf"])
-    obs = st.text_input("Observaciones")
-
-    if st.form_submit_button("Guardar reconocimiento"):
-        nombre_doc = ""
-        if doc:
-            ruta = DOCS_MED / str(emp_id)
-            ruta.mkdir(parents=True, exist_ok=True)
-            nombre_doc = doc.name
-            (ruta / nombre_doc).write_bytes(doc.read())
-
-        medicos.append({
-            "id_medico": len(medicos) + 1,
-            "id_empleado": emp_id,
-            "fecha": str(fecha),
-            "resultado": resultado,
-            "fecha_caducidad": str(fecha_cad) if caduca else "",
-            "documento": nombre_doc,
-            "observaciones": obs
-        })
-
-        save_json(MED_FILE, medicos)
-        st.success("Reconocimiento médico registrado")
-        st.rerun()
-        # --------------------------------------------------
-# DOCUMENTACIÓN DEL EMPLEADO
 # --------------------------------------------------
-DOC_FILE = DATA_DIR / "documentos.json"
-DOCS_EMP = DATA_DIR / "documentos_empleados"
-
-documentos = load_json(DOC_FILE)
-
+# DOCUMENTACIÓN
+# --------------------------------------------------
 st.divider()
-st.header("📎 Documentación del empleado")
+st.header("📎 Documentación")
 
 docs_emp = [d for d in documentos if d["id_empleado"] == emp_id]
 
 if not docs_emp:
-    st.info("No hay documentación registrada para este empleado.")
+    st.info("No hay documentación.")
 else:
     for d in docs_emp:
-        st.markdown(
-            f"- **{d['tipo']}** | {d['nombre']} | {d['fecha']}"
-        )
-        if d.get("archivo"):
-            st.caption(f"📄 {d['archivo']}")
+        st.markdown(f"- **{d['tipo']}** | {d['nombre']} | {d['fecha']}")
 
-# ---- Subir nuevo documento
-with st.form("nuevo_documento"):
-    st.subheader("➕ Añadir documento")
-
-    tipo = st.selectbox(
-        "Tipo de documento",
-        ["Contrato", "Certificado", "Anexo", "Sanción", "Otro"]
-    )
-    nombre = st.text_input("Nombre / descripción")
-    fecha = st.date_input("Fecha", value=date.today())
-    archivo = st.file_uploader(
-        "Archivo",
-        type=["pdf", "doc", "docx", "jpg", "png"]
-    )
-    obs = st.text_input("Observaciones")
-
-    if st.form_submit_button("Guardar documento"):
-        nombre_archivo = ""
-        if archivo:
-            ruta = DOCS_EMP / str(emp_id)
-            ruta.mkdir(parents=True, exist_ok=True)
-            nombre_archivo = archivo.name
-            (ruta / nombre_archivo).write_bytes(archivo.read())
-
-        documentos.append({
-            "id_documento": len(documentos) + 1,
-            "id_empleado": emp_id,
-            "tipo": tipo,
-            "nombre": nombre,
-            "fecha": str(fecha),
-            "archivo": nombre_archivo,
-            "observaciones": obs
-        })
-
-        save_json(DOC_FILE, documentos)
-        st.success("Documento guardado correctamente")
-        st.rerun()
-
-
-
+if ES_ADMIN:
+    with st.form("nuevo_documento"):
+        st.subheader("➕ Añadir documento")
+        tipo = st.selectbox("Tipo", ["Contrato", "Certificado", "Anexo", "Sanción", "Otro"])
+        nombre = st.text_input("Nombre / descripción")
+        fecha = st.date_input("Fecha", value=date.today())
+        archivo = st.file_uploader("Archivo", type=["pdf", "doc", "docx", "jpg", "png"])
+        obs = st.text_input("Observaciones")
+        if st.form_submit_button("Guardar documento"):
+            nombre_archivo = ""
+            if archivo:
+                ruta = DOCS_EMP / str(emp_id)
+                ruta.mkdir(parents=True, exist_ok=True)
+                nombre_archivo = archivo.name
+                (ruta / nombre_archivo).write_bytes(archivo.read())
+            documentos.append({
+                "id_documento": len(documentos) + 1,
+                "id_empleado": emp_id,
+                "tipo": tipo,
+                "nombre": nombre,
+                "fecha": str(fecha),
+                "archivo": nombre_archivo,
+                "observaciones": obs
+            })
+            save_json(DOC_FILE, documentos)
+            st.success("Documento guardado")
+            st.rerun()
+else:
+    st.info("🔒 Solo el administrador puede subir documentación")
 
 
