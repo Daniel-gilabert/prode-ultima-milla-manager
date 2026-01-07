@@ -206,4 +206,78 @@ with st.form("nuevo_prl"):
 # --------------------------------------------------
 st.divider()
 st.info("Siguiente paso: Reconocimientos médicos del empleado")
+# --------------------------------------------------
+# RECONOCIMIENTOS MÉDICOS
+# --------------------------------------------------
+MED_FILE = DATA_DIR / "medicos.json"
+DOCS_MED = DATA_DIR / "documentos_medicos"
+
+medicos = load_json(MED_FILE)
+
+st.divider()
+st.header("🩺 Reconocimientos médicos")
+
+med_emp = [m for m in medicos if m["id_empleado"] == emp_id]
+hoy = date.today()
+
+if not med_emp:
+    st.info("No hay reconocimientos médicos registrados.")
+else:
+    for m in med_emp:
+        estado = "✅ Vigente"
+        if m["fecha_caducidad"]:
+            cad = datetime.fromisoformat(m["fecha_caducidad"]).date()
+            if cad < hoy:
+                estado = "❌ Caducado"
+            elif (cad - hoy).days <= 30:
+                estado = "⚠️ Próximo a caducar"
+
+        st.markdown(
+            f"- **{m['fecha']}** | {m['resultado']} | {estado}"
+        )
+
+        if m.get("documento"):
+            st.caption(f"📎 {m['documento']}")
+
+# ---- Registrar reconocimiento médico
+with st.form("nuevo_medico"):
+    st.subheader("➕ Registrar reconocimiento médico")
+
+    fecha = st.date_input("Fecha reconocimiento", value=date.today())
+    resultado = st.selectbox(
+        "Resultado",
+        ["Apto", "Apto con limitaciones", "No apto"]
+    )
+
+    caduca = st.checkbox("¿Tiene caducidad?")
+    fecha_cad = None
+    if caduca:
+        fecha_cad = st.date_input("Fecha de caducidad")
+
+    doc = st.file_uploader("Informe médico (PDF)", type=["pdf"])
+    obs = st.text_input("Observaciones")
+
+    if st.form_submit_button("Guardar reconocimiento"):
+        nombre_doc = ""
+        if doc:
+            ruta = DOCS_MED / str(emp_id)
+            ruta.mkdir(parents=True, exist_ok=True)
+            nombre_doc = doc.name
+            (ruta / nombre_doc).write_bytes(doc.read())
+
+        medicos.append({
+            "id_medico": len(medicos) + 1,
+            "id_empleado": emp_id,
+            "fecha": str(fecha),
+            "resultado": resultado,
+            "fecha_caducidad": str(fecha_cad) if caduca else "",
+            "documento": nombre_doc,
+            "observaciones": obs
+        })
+
+        save_json(MED_FILE, medicos)
+        st.success("Reconocimiento médico registrado")
+        st.rerun()
+
+
 
