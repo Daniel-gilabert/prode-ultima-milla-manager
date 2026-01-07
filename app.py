@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import os
+from pathlib import Path
 
 # -----------------------------------------
 # CONFIGURACIÓN GENERAL
@@ -12,15 +13,12 @@ st.set_page_config(
 )
 
 # -----------------------------------------
-# CARGA DE USUARIOS
+# CARGA DE USUARIOS (ROBUSTA)
 # -----------------------------------------
-from pathlib import Path
-import pandas as pd
-
 def load_users():
     path = Path("data/usuarios.csv")
 
-    # Si no existe usuarios.csv, permitir acceso admin por defecto
+    # Usuario admin por defecto si no existe el archivo
     if not path.exists():
         return pd.DataFrame([
             {
@@ -30,33 +28,43 @@ def load_users():
             }
         ])
 
-    try:
-        return pd.read_csv(path, encoding="latin1")
-    except Exception:
-        # Si el archivo existe pero está corrupto, no romper la app
-        return pd.DataFrame([
-            {
-                "username": "admin",
-                "password": "admin",
-                "rol": "admin"
-            }
-        ])
+    # Intentos de lectura robustos
+    for encoding in ["utf-8-sig", "latin1"]:
+        try:
+            df = pd.read_csv(path, dtype=str, encoding=encoding).fillna("")
+            return df
+        except Exception:
+            pass
+
+    # Fallback absoluto (no romper la app)
+    return pd.DataFrame([
+        {
+            "username": "admin",
+            "password": "admin",
+            "rol": "admin"
+        }
+    ])
 
 # -----------------------------------------
-# VALIDACIÓN DE CREDENCIALES
+# VALIDACIÓN DE CREDENCIALES (CORREGIDA)
 # -----------------------------------------
 def validar_usuario(username, password):
     df = load_users()
 
-    df["usuario"] = df["usuario"].astype(str).str.strip()
-    df["contraseña"] = df["contraseña"].astype(str).str.strip()
+    # Normalizar columnas esperadas
+    for col in ["username", "password", "rol"]:
+        if col not in df.columns:
+            df[col] = ""
 
-    user = df[df["usuario"] == username]
+    df["username"] = df["username"].astype(str).str.strip()
+    df["password"] = df["password"].astype(str).str.strip()
+
+    user = df[df["username"] == str(username).strip()]
+
     if not user.empty:
-        stored_pass = str(user.iloc[0]["contraseña"])
+        stored_pass = user.iloc[0]["password"]
         if stored_pass == str(password):
-            rol = user.iloc[0]["rol"]
-            return True, rol
+            return True, user.iloc[0]["rol"]
 
     return False, None
 
@@ -82,22 +90,21 @@ def pantalla_login():
             st.error("Usuario o contraseña incorrectos")
 
 # -----------------------------------------
-# MENÚ ORDENADO SEGÚN TU LISTA (1–2–6–3–4–7–10–8–9)
+# MENÚ PRINCIPAL
 # -----------------------------------------
 def mostrar_paginas():
     st.sidebar.title("Menú")
 
-    # ORDEN PERSONALIZADO EXACTO QUE PEDISTE
     orden_menu = {
-        "9_Dashboard": "Dashboard",               # 1
-        "Empleados": "Empleados",                 # 2
-        "6_EPIs": "EPIs",                         # 6
-        "3_Servicios": "Servicios",               # 3
-        "4_Vehiculos": "Vehículos",               # 4
-        "8_Mantenimiento": "Mantenimiento",       # 7
-        "Documentacion": "Documentación",         # 10
-        "10_Papelera_Central": "Papelera Central",# 8
-        "99_Papelera": "Papelera",                # 9
+        "9_Dashboard": "Dashboard",
+        "Empleados": "Empleados",
+        "6_EPIs": "EPIs",
+        "3_Servicios": "Servicios",
+        "4_Vehiculos": "Vehículos",
+        "8_Mantenimiento": "Mantenimiento",
+        "Documentacion": "Documentación",
+        "10_Papelera_Central": "Papelera Central",
+        "99_Papelera": "Papelera",
     }
 
     seleccion = st.sidebar.radio("Ir a:", list(orden_menu.values()))
@@ -120,7 +127,7 @@ def mostrar_paginas():
 # -----------------------------------------
 # CONTROL PRINCIPAL
 # -----------------------------------------
-if "login" not in st.session_state or st.session_state["login"] != True:
+if "login" not in st.session_state or st.session_state["login"] is not True:
     pantalla_login()
 else:
     mostrar_paginas()
