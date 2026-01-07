@@ -14,11 +14,33 @@ st.set_page_config(
 # -----------------------------------------
 # CARGA DE USUARIOS
 # -----------------------------------------
+from pathlib import Path
+import pandas as pd
+
 def load_users():
+    path = Path("data/usuarios.csv")
+
+    # Si no existe usuarios.csv, permitir acceso admin por defecto
+    if not path.exists():
+        return pd.DataFrame([
+            {
+                "username": "admin",
+                "password": "admin",
+                "rol": "admin"
+            }
+        ])
+
     try:
-        return pd.read_csv("data/usuarios.csv", encoding="utf-8-sig")
-    except:
-        return pd.read_csv("data/usuarios.csv", encoding="latin1")
+        return pd.read_csv(path, encoding="latin1")
+    except Exception:
+        # Si el archivo existe pero está corrupto, no romper la app
+        return pd.DataFrame([
+            {
+                "username": "admin",
+                "password": "admin",
+                "rol": "admin"
+            }
+        ])
 
 # -----------------------------------------
 # VALIDACIÓN DE CREDENCIALES
