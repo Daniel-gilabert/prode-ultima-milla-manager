@@ -3,60 +3,65 @@ import pandas as pd
 import os
 from pathlib import Path
 
-# -----------------------------------------
+# =========================================
 # CONFIGURACIÓN GENERAL
-# -----------------------------------------
+# =========================================
 st.set_page_config(
     page_title="PRODE Última Milla Manager",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# -----------------------------------------
+# =========================================
 # CARGA DE USUARIOS
-# -----------------------------------------
+# =========================================
 def load_users():
     path = Path("data/usuarios.csv")
 
-    # Si no existe usuarios.csv → admin por defecto
+    # Si NO existe usuarios.csv → admin por defecto
     if not path.exists():
         return pd.DataFrame([
             {"usuario": "admin", "contraseña": "admin", "rol": "admin"}
         ])
 
     try:
-        df = pd.read_csv(path, dtype=str)
-        df.columns = df.columns.str.lower().str.strip()
-        return df
+        df = pd.read_csv(path, encoding="latin1", dtype=str).fillna("")
     except Exception:
-        # Si el archivo está corrupto
+        # Archivo corrupto → no romper la app
         return pd.DataFrame([
             {"usuario": "admin", "contraseña": "admin", "rol": "admin"}
         ])
 
-# -----------------------------------------
-# VALIDACIÓN DE CREDENCIALES
-# -----------------------------------------
+    # Validar columnas mínimas
+    columnas_necesarias = {"usuario", "contraseña", "rol"}
+    if not columnas_necesarias.issubset(df.columns):
+        return pd.DataFrame([
+            {"usuario": "admin", "contraseña": "admin", "rol": "admin"}
+        ])
+
+    return df
+
+
+# =========================================
+# VALIDACIÓN DE LOGIN
+# =========================================
 def validar_usuario(username, password):
     df = load_users()
-
-    if "usuario" not in df.columns or "contraseña" not in df.columns:
-        return False, None
 
     df["usuario"] = df["usuario"].astype(str).str.strip()
     df["contraseña"] = df["contraseña"].astype(str).str.strip()
 
-    user = df[df["usuario"] == username]
-
+    user = df[df["usuario"] == str(username).strip()]
     if not user.empty:
-        if user.iloc[0]["contraseña"] == password:
-            return True, user.iloc[0].get("rol", "user")
+        if user.iloc[0]["contraseña"] == str(password).strip():
+            return True, user.iloc[0]["rol"]
 
     return False, None
 
-# -----------------------------------------
-# PANTALLA DE LOGIN
-# -----------------------------------------
+
+# =========================================
+# PANTALLA LOGIN
+# =========================================
 def pantalla_login():
     st.title("🚚 PRODE Última Milla Manager")
     st.subheader("Acceso al sistema")
@@ -66,7 +71,6 @@ def pantalla_login():
 
     if st.button("Entrar"):
         ok, rol = validar_usuario(username, password)
-
         if ok:
             st.session_state["login"] = True
             st.session_state["usuario"] = username
@@ -75,9 +79,10 @@ def pantalla_login():
         else:
             st.error("Usuario o contraseña incorrectos")
 
-# -----------------------------------------
+
+# =========================================
 # MENÚ PRINCIPAL
-# -----------------------------------------
+# =========================================
 def mostrar_paginas():
     st.sidebar.title("🚚 PRODE Última Milla")
 
@@ -98,8 +103,9 @@ def mostrar_paginas():
     }
 
     opcion_consulta = st.sidebar.radio(
-        "Ver",
-        list(menu_consulta.keys())
+        "Ver información",
+        list(menu_consulta.keys()),
+        key="menu_consulta"
     )
 
     archivo = menu_consulta[opcion_consulta]
@@ -122,8 +128,9 @@ def mostrar_paginas():
         }
 
         opcion_admin = st.sidebar.radio(
-            "Administrar",
-            list(menu_admin.keys())
+            "Administración",
+            list(menu_admin.keys()),
+            key="menu_admin"
         )
 
         archivo = menu_admin[opcion_admin]
@@ -134,7 +141,7 @@ def mostrar_paginas():
     ruta = os.path.join("pages", archivo)
 
     if not os.path.exists(ruta):
-        st.error(f"No existe la página: {archivo}")
+        st.error(f"❌ No existe la página: {archivo}")
     else:
         with open(ruta, "r", encoding="utf-8") as f:
             exec(f.read(), globals())
@@ -150,14 +157,11 @@ def mostrar_paginas():
         st.session_state.clear()
         st.rerun()
 
-# -----------------------------------------
+
+# =========================================
 # CONTROL PRINCIPAL
-# -----------------------------------------
+# =========================================
 if "login" not in st.session_state or st.session_state["login"] != True:
     pantalla_login()
 else:
     mostrar_paginas()
-
-    mostrar_paginas()
-
-
