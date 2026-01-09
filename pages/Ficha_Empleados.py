@@ -1,119 +1,92 @@
 import streamlit as st
 import pandas as pd
 from pathlib import Path
+import json
 
-# -----------------------------------------
-# CONFIG
-# -----------------------------------------
-st.title("👤 Ficha de Empleados")
+st.title("🛠️ Administrar Empleados")
 
 DATA_FILE = Path("data/empleados.json")
-FOTOS_DIR = Path("data/fotos_empleados")
 
 # -----------------------------------------
-# CARGA DE DATOS
+# CARGA
 # -----------------------------------------
 if not DATA_FILE.exists():
-    st.warning("⚠️ No hay empleados cargados en el sistema.")
+    st.error("No existe empleados.json")
     st.stop()
 
-df = pd.read_json(DATA_FILE)
-
-if df.empty:
-    st.warning("⚠️ No hay empleados cargados en el sistema.")
-    st.stop()
-
-# Asegurar tipos
+df = pd.read_json(DATA_FILE).fillna("")
 df["id_empleado"] = df["id_empleado"].astype(int)
-df = df.fillna("")
+
+st.success(f"Hay {len(df)} empleados guardados en el sistema.")
 
 # -----------------------------------------
-# SELECTOR DE EMPLEADO
+# SELECCIÓN
 # -----------------------------------------
-st.subheader("Selecciona un empleado")
+st.subheader("Selecciona empleado a editar")
 
 opciones = {
     f"{row['nombre']} ({row['dni']})": row["id_empleado"]
     for _, row in df.iterrows()
 }
 
-empleado_label = st.selectbox(
-    "Empleado",
-    list(opciones.keys())
-)
+label = st.selectbox("Empleado", list(opciones.keys()))
+id_empleado = opciones[label]
 
-id_empleado = opciones[empleado_label]
 empleado = df[df["id_empleado"] == id_empleado].iloc[0]
 
 st.divider()
 
 # -----------------------------------------
-# LAYOUT PRINCIPAL
+# FORMULARIO EDICIÓN
 # -----------------------------------------
-col_foto, col_info = st.columns([1, 3])
+st.subheader("✏️ Editar datos del empleado")
 
-# ---------- FOTO ----------
-with col_foto:
-    foto_path = FOTOS_DIR / f"{id_empleado}.jpg"
+with st.form("editar_empleado"):
+    nombre = st.text_input("Nombre", empleado["nombre"])
+    dni = st.text_input("DNI", empleado["dni"])
+    email = st.text_input("Email", empleado["email"])
+    telefono = st.text_input("Teléfono", empleado["telefono"])
+    puesto = st.text_input("Puesto", empleado["puesto"])
+    ubicacion = st.text_input("Ubicación", empleado["ubicacion"])
+    estado = st.selectbox(
+        "Estado",
+        ["activo", "baja"],
+        index=0 if empleado["estado"] == "activo" else 1
+    )
 
-    if foto_path.exists():
-        st.image(str(foto_path), width=150)
-    else:
-        st.info("📷 Sin foto")
+    observaciones = st.text_area(
+        "Observaciones",
+        empleado.get("observaciones", "")
+    )
 
-# ---------- DATOS ----------
-with col_info:
-    st.markdown(f"## {empleado['nombre']}")
-
-    st.write(f"**DNI:** {empleado['dni']}")
-    st.write(f"**Email:** {empleado['email']}")
-    st.write(f"**Teléfono:** {empleado['telefono']}")
-    st.write(f"**Puesto:** {empleado['puesto']}")
-    st.write(f"**Ubicación:** {empleado['ubicacion']}")
-    st.write(f"**Estado:** {empleado['estado']}")
-
-st.divider()
+    guardar = st.form_submit_button("💾 Guardar cambios")
 
 # -----------------------------------------
-# EPIs (LECTURA)
+# GUARDADO
 # -----------------------------------------
-st.subheader("📦 EPIs")
+if guardar:
+    df.loc[df["id_empleado"] == id_empleado, [
+        "nombre",
+        "dni",
+        "email",
+        "telefono",
+        "puesto",
+        "ubicacion",
+        "estado",
+        "observaciones"
+    ]] = [
+        nombre,
+        dni,
+        email,
+        telefono,
+        puesto,
+        ubicacion,
+        estado,
+        observaciones
+    ]
 
-if "epis" in empleado and empleado["epis"]:
-    st.success("EPIs registrados")
-    st.json(empleado["epis"])
-else:
-    st.info("No hay EPIs registrados para este empleado.")
+    df.to_json(DATA_FILE, orient="records", indent=2, force_ascii=False)
 
-# -----------------------------------------
-# AUSENCIAS (LECTURA)
-# -----------------------------------------
-st.subheader("📅 Ausencias")
+    st.success("✅ Cambios guardados correctamente")
+    st.rerun()
 
-if "ausencias" in empleado and empleado["ausencias"]:
-    st.success("Ausencias registradas")
-    st.json(empleado["ausencias"])
-else:
-    st.info("No hay ausencias registradas.")
-
-# -----------------------------------------
-# SERVICIOS (LECTURA)
-# -----------------------------------------
-st.subheader("🛠️ Servicios")
-
-if "servicios" in empleado and empleado["servicios"]:
-    st.success("Servicios registrados")
-    st.json(empleado["servicios"])
-else:
-    st.info("No hay servicios asociados.")
-
-# -----------------------------------------
-# VEHÍCULO ASIGNADO (PREPARADO PARA CLICK FUTURO)
-# -----------------------------------------
-st.subheader("🚗 Vehículo asignado")
-
-if "vehiculo_id" in empleado and empleado["vehiculo_id"]:
-    st.info(f"Vehículo asignado ID: {empleado['vehiculo_id']}")
-    st.caption("👉 (En el siguiente paso lo haremos clickable)")
-else:
-    st.info("No tiene vehículo asignado.")
