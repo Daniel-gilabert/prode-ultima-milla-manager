@@ -103,11 +103,15 @@ def cargar_pagina(nombre):
 # MENÚ PRINCIPAL
 # -----------------------------------------
 def mostrar_paginas():
-    rol = st.session_state["rol"]
+    st.sidebar.markdown("## 🚚 PRODE Última Milla")
 
-    st.sidebar.title("🚚 PRODE Última Milla")
+    rol = st.session_state.get("rol", "")
 
-    st.sidebar.subheader("Consulta")
+    # -------------------------
+    # MENÚ CONSULTA (TODOS)
+    # -------------------------
+    st.sidebar.markdown("### 📊 Consulta")
+
     menu_consulta = {
         "Dashboard": "Dashboard.py",
         "Ficha empleados": "Ficha_Empleados.py",
@@ -123,11 +127,12 @@ def mostrar_paginas():
         key="menu_consulta"
     )
 
-    cargar_pagina(menu_consulta[opcion])
-
+    # -------------------------
+    # MENÚ ADMIN (SOLO ADMIN)
+    # -------------------------
     if rol == "admin":
         st.sidebar.markdown("---")
-        st.sidebar.subheader("Gestión (Admin)")
+        st.sidebar.markdown("### 🛠️ Gestión (Admin)")
 
         menu_admin = {
             "Administrar empleados": "Administrar_Empleados.py",
@@ -144,15 +149,33 @@ def mostrar_paginas():
             key="menu_admin"
         )
 
-        cargar_pagina(menu_admin[opcion_admin])
+        archivo = menu_admin[opcion_admin]
 
+    else:
+        archivo = menu_consulta[opcion]
+
+    # -------------------------
+    # CARGAR PÁGINA
+    # -------------------------
+    ruta = os.path.join("pages", archivo)
+
+    if os.path.exists(ruta):
+        with open(ruta, "r", encoding="utf-8") as f:
+            exec(f.read(), globals())
+    else:
+        st.error(f"No existe la página: {archivo}")
+
+    # -------------------------
+    # FOOTER USUARIO
+    # -------------------------
     st.sidebar.markdown("---")
-    st.sidebar.write(f"👤 **Usuario:** {st.session_state['usuario']}")
-    st.sidebar.write(f"🔐 **Rol:** {rol}")
+    st.sidebar.write(f"👤 Usuario: **{st.session_state['usuario']}**")
+    st.sidebar.write(f"🔐 Rol: **{st.session_state['rol']}**")
 
     if st.sidebar.button("Cerrar sesión"):
         st.session_state.clear()
         st.rerun()
+
 
 # -----------------------------------------
 # CONTROL PRINCIPAL
