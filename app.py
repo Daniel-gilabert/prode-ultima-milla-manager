@@ -11,6 +11,16 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+# -----------------------------------------
+# OCULTAR MENÚ AUTOMÁTICO DE STREAMLIT
+# -----------------------------------------
+st.markdown("""
+    <style>
+        [data-testid="stSidebarNav"] {
+            display: none;
+        }
+    </style>
+""", unsafe_allow_html=True)
 
 # =========================================
 # CARGA DE USUARIOS
