@@ -13,58 +13,44 @@ st.set_page_config(
 )
 
 # -----------------------------------------
-# CARGA DE USUARIOS (ROBUSTA)
+# CARGA DE USUARIOS
 # -----------------------------------------
 def load_users():
     path = Path("data/usuarios.csv")
 
-    # Usuario admin por defecto si no existe el archivo
+    # Si no existe usuarios.csv → admin por defecto
     if not path.exists():
         return pd.DataFrame([
-            {
-                "username": "admin",
-                "password": "admin",
-                "rol": "admin"
-            }
+            {"usuario": "admin", "contraseña": "admin", "rol": "admin"}
         ])
 
-    # Intentos de lectura robustos
-    for encoding in ["utf-8-sig", "latin1"]:
-        try:
-            df = pd.read_csv(path, dtype=str, encoding=encoding).fillna("")
-            return df
-        except Exception:
-            pass
-
-    # Fallback absoluto (no romper la app)
-    return pd.DataFrame([
-        {
-            "username": "admin",
-            "password": "admin",
-            "rol": "admin"
-        }
-    ])
+    try:
+        df = pd.read_csv(path, dtype=str)
+        df.columns = df.columns.str.lower().str.strip()
+        return df
+    except Exception:
+        # Si el archivo está corrupto
+        return pd.DataFrame([
+            {"usuario": "admin", "contraseña": "admin", "rol": "admin"}
+        ])
 
 # -----------------------------------------
-# VALIDACIÓN DE CREDENCIALES (CORREGIDA)
+# VALIDACIÓN DE CREDENCIALES
 # -----------------------------------------
 def validar_usuario(username, password):
     df = load_users()
 
-    # Normalizar columnas esperadas
-    for col in ["username", "password", "rol"]:
-        if col not in df.columns:
-            df[col] = ""
+    if "usuario" not in df.columns or "contraseña" not in df.columns:
+        return False, None
 
-    df["username"] = df["username"].astype(str).str.strip()
-    df["password"] = df["password"].astype(str).str.strip()
+    df["usuario"] = df["usuario"].astype(str).str.strip()
+    df["contraseña"] = df["contraseña"].astype(str).str.strip()
 
-    user = df[df["username"] == str(username).strip()]
+    user = df[df["usuario"] == username]
 
     if not user.empty:
-        stored_pass = user.iloc[0]["password"]
-        if stored_pass == str(password):
-            return True, user.iloc[0]["rol"]
+        if user.iloc[0]["contraseña"] == password:
+            return True, user.iloc[0].get("rol", "user")
 
     return False, None
 
@@ -72,7 +58,7 @@ def validar_usuario(username, password):
 # PANTALLA DE LOGIN
 # -----------------------------------------
 def pantalla_login():
-    st.title("PRODE Última Milla Manager")
+    st.title("🚚 PRODE Última Milla Manager")
     st.subheader("Acceso al sistema")
 
     username = st.text_input("Usuario")
@@ -93,43 +79,85 @@ def pantalla_login():
 # MENÚ PRINCIPAL
 # -----------------------------------------
 def mostrar_paginas():
-    st.sidebar.title("Menú")
+    st.sidebar.title("🚚 PRODE Última Milla")
 
-    orden_menu = {
-        "9_Dashboard": "Dashboard",
-        "Empleados": "Empleados",
-        "6_EPIs": "EPIs",
-        "3_Servicios": "Servicios",
-        "4_Vehiculos": "Vehículos",
-        "8_Mantenimiento": "Mantenimiento",
-        "Documentacion": "Documentación",
-        "10_Papelera_Central": "Papelera Central",
-        "99_Papelera": "Papelera",
+    rol = st.session_state.get("rol", "user")
+    ES_ADMIN = rol == "admin"
+
+    # =========================
+    # CONSULTA (TODOS)
+    # =========================
+    st.sidebar.subheader("📊 Consulta")
+
+    menu_consulta = {
+        "Dashboard": "9_Dashboard.py",
+        "Ficha de empleados": "Ficha_Empleados.py",
+        "Ficha de vehículos": "Ficha_Vehiculos.py",
+        "Servicios": "3_Servicios.py",
+        "Calendario de ausencias": "Ausencias.py",
     }
 
-    seleccion = st.sidebar.radio("Ir a:", list(orden_menu.values()))
+    opcion_consulta = st.sidebar.radio(
+        "Ver",
+        list(menu_consulta.keys())
+    )
 
-    archivo = [k for k, v in orden_menu.items() if v == seleccion][0] + ".py"
+    archivo = menu_consulta[opcion_consulta]
+
+    # =========================
+    # GESTIÓN (SOLO ADMIN)
+    # =========================
+    if ES_ADMIN:
+        st.sidebar.divider()
+        st.sidebar.subheader("⚙️ Gestión")
+
+        menu_admin = {
+            "Administrar empleados": "Administrar_Empleados.py",
+            "Administrar vehículos": "Administrar_Vehiculos.py",
+            "Administrar servicios": "Administrar_Servicios.py",
+            "Gestionar ausencias": "Administrar_Ausencias.py",
+            "EPIs / PRL": "6_EPIs.py",
+            "Documentación": "Documentacion.py",
+            "Papelera": "10_Papelera_Central.py",
+        }
+
+        opcion_admin = st.sidebar.radio(
+            "Administrar",
+            list(menu_admin.keys())
+        )
+
+        archivo = menu_admin[opcion_admin]
+
+    # =========================
+    # CARGA DE PÁGINA
+    # =========================
     ruta = os.path.join("pages", archivo)
 
-    with open(ruta, "r", encoding="utf-8") as f:
-        code = f.read()
-        exec(code, globals())
+    if not os.path.exists(ruta):
+        st.error(f"No existe la página: {archivo}")
+    else:
+        with open(ruta, "r", encoding="utf-8") as f:
+            exec(f.read(), globals())
 
-    st.sidebar.write("---")
-    st.sidebar.write(f"Usuario: **{st.session_state['usuario']}**")
-    st.sidebar.write(f"Rol: **{st.session_state['rol']}**")
+    # =========================
+    # SESIÓN
+    # =========================
+    st.sidebar.divider()
+    st.sidebar.write(f"👤 **Usuario:** {st.session_state.get('usuario','')}")
+    st.sidebar.write(f"🔑 **Rol:** {rol}")
 
-    if st.sidebar.button("Cerrar sesión"):
+    if st.sidebar.button("🚪 Cerrar sesión"):
         st.session_state.clear()
         st.rerun()
 
 # -----------------------------------------
 # CONTROL PRINCIPAL
 # -----------------------------------------
-if "login" not in st.session_state or st.session_state["login"] is not True:
+if "login" not in st.session_state or st.session_state["login"] != True:
     pantalla_login()
 else:
+    mostrar_paginas()
+
     mostrar_paginas()
 
 
