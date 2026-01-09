@@ -58,12 +58,15 @@ st.markdown("---")
 col1, col2 = st.columns([1, 3])
 
 with col1:
-    # Foto carnet si existe
-    foto = Path(f"data/fotos_empleados/{emp.get('id','')}.jpg")
-    if foto.exists():
-        st.image(str(foto), width=120)
-    else:
-        st.info("📷 Sin foto")
+ from pathlib import Path
+
+foto_path = Path(f"data/fotos_empleados/{empleado['id_empleado']}.jpg")
+
+if foto_path.exists():
+    st.image(str(foto_path), width=150, caption="Foto empleado")
+else:
+    st.info("📷 Sin foto")
+
 
 with col2:
     st.markdown(f"### {emp.get('nombre','')} {emp.get('apellidos','')}")
@@ -90,6 +93,7 @@ st.info("Sección de servicios (en construcción)")
 
 st.subheader("🚗 Vehículo asignado")
 st.info("Sección de vehículo asignado (en construcción)")
+
 
 
 
