@@ -11,29 +11,28 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
 # -----------------------------------------
-# OCULTAR MENÚ AUTOMÁTICO DE STREAMLIT
+# OCULTAR MENÚ AUTOMÁTICO DE STREAMLIT (CLAVE)
 # -----------------------------------------
 st.markdown("""
 <style>
-    [data-testid="stSidebarNav"] {
-        display: none;
-    }
+[data-testid="stSidebarNav"] {
+    display: none;
+}
 </style>
 """, unsafe_allow_html=True)
 
 # -----------------------------------------
-# CARGA DE USUARIOS
+# CARGA DE USUARIOS (ROBUSTA)
 # -----------------------------------------
 def load_users():
     path = Path("data/usuarios.csv")
 
     if not path.exists():
-        return pd.DataFrame([{
-            "username": "admin",
-            "password": "admin",
-            "rol": "admin"
-        }])
+        return pd.DataFrame([
+            {"username": "admin", "password": "admin", "rol": "admin"}
+        ])
 
     for encoding in ["utf-8-sig", "latin1"]:
         try:
@@ -41,11 +40,9 @@ def load_users():
         except Exception:
             pass
 
-    return pd.DataFrame([{
-        "username": "admin",
-        "password": "admin",
-        "rol": "admin"
-    }])
+    return pd.DataFrame([
+        {"username": "admin", "password": "admin", "rol": "admin"}
+    ])
 
 # -----------------------------------------
 # VALIDACIÓN DE USUARIO
@@ -79,40 +76,29 @@ def pantalla_login():
 
     if st.button("Entrar"):
         ok, rol = validar_usuario(username, password)
+
         if ok:
             st.session_state["login"] = True
             st.session_state["usuario"] = username
             st.session_state["rol"] = rol
+            st.session_state["pagina_actual"] = "Dashboard"
             st.rerun()
         else:
             st.error("Usuario o contraseña incorrectos")
 
 # -----------------------------------------
-# CARGAR PÁGINA
-# -----------------------------------------
-def cargar_pagina(nombre):
-    ruta = os.path.join("pages", nombre)
-    if not os.path.exists(ruta):
-        st.error(f"No existe la página: {nombre}")
-        return
-
-    with open(ruta, "r", encoding="utf-8") as f:
-        exec(f.read(), globals())
-
-# -----------------------------------------
-# MENÚ PRINCIPAL
+# NAVEGACIÓN PRINCIPAL
 # -----------------------------------------
 def mostrar_paginas():
-    st.sidebar.markdown("## 🚚 PRODE Última Milla")
 
-    rol = st.session_state.get("rol", "")
+    # Página activa (UNA SOLA SIEMPRE)
+    if "pagina_actual" not in st.session_state:
+        st.session_state["pagina_actual"] = "Dashboard"
 
-    # -------------------------
-    # MENÚ CONSULTA (TODOS)
-    # -------------------------
-    st.sidebar.markdown("### 📊 Consulta")
+    # ---------------- CONSULTA ----------------
+    st.sidebar.markdown("## 📊 Consulta")
 
-    menu_consulta = {
+    consulta_paginas = {
         "Dashboard": "Dashboard.py",
         "Ficha empleados": "Ficha_Empleados.py",
         "Ficha vehículos": "Ficha_Vehiculos.py",
@@ -121,20 +107,28 @@ def mostrar_paginas():
         "Documentación": "Documentacion.py",
     }
 
-    opcion = st.sidebar.radio(
+    consulta_keys = list(consulta_paginas.keys())
+    consulta_index = (
+        consulta_keys.index(st.session_state["pagina_actual"])
+        if st.session_state["pagina_actual"] in consulta_keys else 0
+    )
+
+    seleccion_consulta = st.sidebar.radio(
         "Ir a:",
-        list(menu_consulta.keys()),
+        consulta_keys,
+        index=consulta_index,
         key="menu_consulta"
     )
 
-    # -------------------------
-    # MENÚ ADMIN (SOLO ADMIN)
-    # -------------------------
-    if rol == "admin":
-        st.sidebar.markdown("---")
-        st.sidebar.markdown("### 🛠️ Gestión (Admin)")
+    st.session_state["pagina_actual"] = seleccion_consulta
 
-        menu_admin = {
+    # ---------------- GESTIÓN (ADMIN) ----------------
+    admin_paginas = {}
+    if st.session_state["rol"] == "admin":
+        st.sidebar.markdown("---")
+        st.sidebar.markdown("## 🛠️ Gestión (Admin)")
+
+        admin_paginas = {
             "Administrar empleados": "Administrar_Empleados.py",
             "Administrar vehículos": "Administrar_Vehiculos.py",
             "Administrar servicios": "Administrar_Servicios.py",
@@ -143,31 +137,38 @@ def mostrar_paginas():
             "Papelera central": "Papelera_Central.py",
         }
 
-        opcion_admin = st.sidebar.radio(
+        admin_keys = list(admin_paginas.keys())
+        admin_index = (
+            admin_keys.index(st.session_state["pagina_actual"])
+            if st.session_state["pagina_actual"] in admin_keys else -1
+        )
+
+        seleccion_admin = st.sidebar.radio(
             "Administrar:",
-            list(menu_admin.keys()),
+            ["—"] + admin_keys,
+            index=admin_index + 1 if admin_index >= 0 else 0,
             key="menu_admin"
         )
 
-        archivo = menu_admin[opcion_admin]
+        if seleccion_admin != "—":
+            st.session_state["pagina_actual"] = seleccion_admin
 
-    else:
-        archivo = menu_consulta[opcion]
+    # ---------------- CARGA DE LA PÁGINA ----------------
+    pagina = st.session_state["pagina_actual"]
 
-    # -------------------------
-    # CARGAR PÁGINA
-    # -------------------------
-    ruta = os.path.join("pages", archivo)
+    archivo = (
+        consulta_paginas.get(pagina)
+        or admin_paginas.get(pagina)
+    )
 
-    if os.path.exists(ruta):
-        with open(ruta, "r", encoding="utf-8") as f:
-            exec(f.read(), globals())
-    else:
-        st.error(f"No existe la página: {archivo}")
+    if archivo:
+        ruta = os.path.join("pages", archivo)
+        if os.path.exists(ruta):
+            exec(open(ruta, encoding="utf-8").read(), globals())
+        else:
+            st.error(f"No existe la página: {archivo}")
 
-    # -------------------------
-    # FOOTER USUARIO
-    # -------------------------
+    # ---------------- INFO USUARIO ----------------
     st.sidebar.markdown("---")
     st.sidebar.write(f"👤 Usuario: **{st.session_state['usuario']}**")
     st.sidebar.write(f"🔐 Rol: **{st.session_state['rol']}**")
@@ -176,11 +177,10 @@ def mostrar_paginas():
         st.session_state.clear()
         st.rerun()
 
-
 # -----------------------------------------
 # CONTROL PRINCIPAL
 # -----------------------------------------
-if "login" not in st.session_state or not st.session_state["login"]:
+if "login" not in st.session_state or st.session_state["login"] is not True:
     pantalla_login()
 else:
     mostrar_paginas()
