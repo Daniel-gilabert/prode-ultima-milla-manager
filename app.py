@@ -86,8 +86,50 @@ def pantalla_login():
 def mostrar_paginas():
     st.sidebar.title("🚚 PRODE Última Milla")
 
-    rol = st.session_state.get("rol", "user")
-    ES_ADMIN = rol == "admin"
+    rol = st.session_state.get("rol", "")
+
+    # Menú común
+    menu = {
+        "Dashboard": "9_Dashboard.py",
+        "Ficha de empleados": "Ficha_Empleados.py",
+        "Ficha de vehículos": "Ficha_Vehiculos.py",
+        "Servicios": "3_Servicios.py",
+        "Ausencias": "5_Ausencias.py",
+        "EPIs": "6_EPIs.py",
+        "Documentación": "Documentacion.py",
+    }
+
+    # Opciones solo admin
+    if rol == "admin":
+        menu_admin = {
+            "Administrar empleados": "Administrar_Empleados.py",
+            "Administrar vehículos": "Administrar_Vehiculos.py",
+            "Mantenimiento": "8_Mantenimiento.py",
+            "Papelera Central": "10_Papelera_Central.py",
+            "Papelera": "99_Papelera.py",
+        }
+        menu.update(menu_admin)
+
+    opcion = st.sidebar.radio("Ir a:", list(menu.keys()))
+
+    archivo = menu[opcion]
+    ruta = os.path.join("pages", archivo)
+
+    if not os.path.exists(ruta):
+        st.error(f"No existe la página: {archivo}")
+        return
+
+    with open(ruta, "r", encoding="utf-8") as f:
+        code = f.read()
+        exec(code, globals())
+
+    st.sidebar.markdown("---")
+    st.sidebar.write(f"👤 Usuario: **{st.session_state['usuario']}**")
+    st.sidebar.write(f"🔐 Rol: **{st.session_state['rol']}**")
+
+    if st.sidebar.button("Cerrar sesión"):
+        st.session_state.clear()
+        st.rerun()
 
     # =========================
     # CONSULTA (TODOS)
