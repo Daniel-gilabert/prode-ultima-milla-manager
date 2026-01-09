@@ -2,105 +2,133 @@ import streamlit as st
 import pandas as pd
 import json
 from pathlib import Path
+import uuid
 
-# --------------------------------------------------
-# CONFIG
-# --------------------------------------------------
-st.set_page_config(page_title="Administrar Empleados", layout="wide")
+st.title("🛠️ Administrar Empleados")
 
+# -----------------------------------------
+# RUTAS
+# -----------------------------------------
 DATA_DIR = Path("data")
 DATA_DIR.mkdir(exist_ok=True)
 
-EMP_JSON = DATA_DIR / "empleados.json"
+EMP_FILE = DATA_DIR / "empleados.json"
 
-# --------------------------------------------------
-# FUNCIONES
-# --------------------------------------------------
-def guardar_empleados_json(df: pd.DataFrame):
-    empleados = []
+# -----------------------------------------
+# FUNCIONES DE CARGA / GUARDADO
+# -----------------------------------------
+def load_empleados():
+    if EMP_FILE.exists():
+        try:
+            return json.loads(EMP_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            return []
+    return []
 
-    for _, row in df.iterrows():
-        empleados.append({
-            "id_empleado": int(row["id_empleado"]),
-            "nombre": str(row["nombre"]).strip(),
-            "dni": None if pd.isna(row.get("dni")) else str(row.get("dni")),
-            "email": None if pd.isna(row.get("email")) else str(row.get("email")),
-            "telefono": None if pd.isna(row.get("telefono")) else str(row.get("telefono")),
-            "puesto": None if pd.isna(row.get("puesto")) else str(row.get("puesto")),
-            "ubicacion": None if pd.isna(row.get("ubicacion")) else str(row.get("ubicacion")),
-            "estado": str(row.get("estado", "activo")).lower()
-        })
-
-    EMP_JSON.write_text(
-        json.dumps(empleados, ensure_ascii=False, indent=2),
+def save_empleados(empleados):
+    EMP_FILE.write_text(
+        json.dumps(empleados, indent=2, ensure_ascii=False),
         encoding="utf-8"
     )
 
-def validar_columnas(df: pd.DataFrame):
-    obligatorias = ["id_empleado", "nombre"]
-    faltan = [c for c in obligatorias if c not in df.columns]
-    return faltan
+# -----------------------------------------
+# ESTADO ACTUAL
+# -----------------------------------------
+empleados = load_empleados()
+hay_empleados = len(empleados) > 0
 
-# --------------------------------------------------
-# UI
-# --------------------------------------------------
-st.title("👥 Administrar Empleados")
-st.caption("Carga masiva de empleados desde Excel")
+# -----------------------------------------
+# INFO INICIAL
+# -----------------------------------------
+if hay_empleados:
+    st.success(f"✅ Hay {len(empleados)} empleados guardados en el sistema.")
+    st.info(
+        "⚠️ Los empleados **NO se borran ni se recargan automáticamente**.\n\n"
+        "Solo cambiarán si subes un nuevo Excel y confirmas que quieres sobrescribir."
+    )
+else:
+    st.warning("⚠️ No hay empleados cargados todavía.")
 
-uploaded = st.file_uploader(
-    "📤 Sube el Excel de empleados",
+st.markdown("---")
+
+# -----------------------------------------
+# SUBIR EXCEL
+# -----------------------------------------
+st.subheader("📤 Cargar empleados desde Excel")
+
+archivo = st.file_uploader(
+    "Sube el Excel de empleados",
     type=["xlsx"]
 )
 
-if uploaded:
+if archivo:
     try:
-        df = pd.read_excel(uploaded)
+        df = pd.read_excel(archivo, dtype=str).fillna("")
 
-        # Limpieza básica
-        df.columns = df.columns.str.strip().str.lower()
+        # Normalizar columnas
+        df.columns = (
+            df.columns.str.lower()
+            .str.strip()
+            .str.replace(" ", "_")
+            .str.replace("á", "a")
+            .str.replace("é", "e")
+            .str.replace("í", "i")
+            .str.replace("ó", "o")
+            .str.replace("ú", "u")
+        )
 
-        faltan = validar_columnas(df)
-        if faltan:
-            st.error(f"❌ Faltan columnas obligatorias: {', '.join(faltan)}")
-            st.stop()
-
-        # Conversión id_empleado
-        df["id_empleado"] = pd.to_numeric(df["id_empleado"], errors="coerce")
-
-        if df["id_empleado"].isna().any():
-            st.error("❌ Hay valores no numéricos en id_empleado")
-            st.stop()
-
-        df["id_empleado"] = df["id_empleado"].astype(int)
-
-        st.success("✅ Excel válido")
-
-        st.subheader("📋 Vista previa")
+        st.success("✅ Excel leído correctamente")
         st.dataframe(df, use_container_width=True)
 
-        if st.button("💾 Guardar empleados en el sistema"):
-            guardar_empleados_json(df)
-            st.success("✅ Empleados guardados correctamente en data/empleados.json")
+        st.markdown("---")
 
-            if EMP_JSON.exists():
-                st.info("📄 empleados.json EXISTE en el sistema")
+        # -----------------------------------------
+        # BOTONES DE GUARDADO
+        # -----------------------------------------
+        if not hay_empleados:
+            if st.button("💾 Guardar empleados en el sistema"):
+                nuevos = []
+
+                for _, row in df.iterrows():
+                    emp = row.to_dict()
+                    emp["id"] = str(uuid.uuid4())
+                    nuevos.append(emp)
+
+                save_empleados(nuevos)
+                st.success("✅ Empleados guardados correctamente.")
+                st.rerun()
+
+        else:
+            st.error("⚠️ Ya existen empleados en el sistema.")
+
+            if st.checkbox("☠️ Confirmo que quiero SOBRESCRIBIR todos los empleados"):
+                if st.button("💾 Sobrescribir empleados"):
+                    nuevos = []
+
+                    for _, row in df.iterrows():
+                        emp = row.to_dict()
+                        emp["id"] = str(uuid.uuid4())
+                        nuevos.append(emp)
+
+                    save_empleados(nuevos)
+                    st.success("✅ Empleados sobrescritos correctamente.")
+                    st.rerun()
 
     except Exception as e:
-        st.error("❌ Error al procesar el Excel")
+        st.error("❌ Error al leer el Excel")
         st.exception(e)
 
-# --------------------------------------------------
-# INFO ESTADO ACTUAL
-# --------------------------------------------------
-st.divider()
-st.subheader("📂 Estado actual del sistema")
+st.markdown("---")
 
-if EMP_JSON.exists():
-    try:
-        empleados = json.loads(EMP_JSON.read_text(encoding="utf-8"))
-        st.success(f"👤 Empleados cargados en sistema: {len(empleados)}")
-    except:
-        st.warning("⚠️ empleados.json existe pero no se puede leer")
+# -----------------------------------------
+# LISTADO ACTUAL (CONTROL)
+# -----------------------------------------
+st.subheader("👥 Empleados actualmente guardados")
+
+if empleados:
+    df_actual = pd.DataFrame(empleados)
+    st.dataframe(df_actual, use_container_width=True)
 else:
-    st.warning("⚠️ No existe data/empleados.json todavía")
+    st.info("No hay empleados guardados todavía.")
+
 
