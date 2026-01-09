@@ -13,45 +13,36 @@ st.set_page_config(
 )
 
 # -----------------------------------------
-# CARGA DE USUARIOS (ROBUSTA)
+# CARGA DE USUARIOS
 # -----------------------------------------
 def load_users():
     path = Path("data/usuarios.csv")
 
-    # Usuario admin por defecto si no existe el archivo
     if not path.exists():
-        return pd.DataFrame([
-            {
-                "username": "admin",
-                "password": "admin",
-                "rol": "admin"
-            }
-        ])
-
-    # Intentos de lectura robustos
-    for encoding in ["utf-8-sig", "latin1"]:
-        try:
-            df = pd.read_csv(path, dtype=str, encoding=encoding).fillna("")
-            return df
-        except Exception:
-            pass
-
-    # Fallback absoluto (no romper la app)
-    return pd.DataFrame([
-        {
+        return pd.DataFrame([{
             "username": "admin",
             "password": "admin",
             "rol": "admin"
-        }
-    ])
+        }])
+
+    for encoding in ["utf-8-sig", "latin1"]:
+        try:
+            return pd.read_csv(path, dtype=str, encoding=encoding).fillna("")
+        except Exception:
+            pass
+
+    return pd.DataFrame([{
+        "username": "admin",
+        "password": "admin",
+        "rol": "admin"
+    }])
 
 # -----------------------------------------
-# VALIDACIÓN DE CREDENCIALES (CORREGIDA)
+# VALIDACIÓN DE USUARIO
 # -----------------------------------------
 def validar_usuario(username, password):
     df = load_users()
 
-    # Normalizar columnas esperadas
     for col in ["username", "password", "rol"]:
         if col not in df.columns:
             df[col] = ""
@@ -61,18 +52,16 @@ def validar_usuario(username, password):
 
     user = df[df["username"] == str(username).strip()]
 
-    if not user.empty:
-        stored_pass = user.iloc[0]["password"]
-        if stored_pass == str(password):
-            return True, user.iloc[0]["rol"]
+    if not user.empty and user.iloc[0]["password"] == str(password):
+        return True, user.iloc[0]["rol"]
 
     return False, None
 
 # -----------------------------------------
-# PANTALLA DE LOGIN
+# LOGIN
 # -----------------------------------------
 def pantalla_login():
-    st.title("PRODE Última Milla Manager")
+    st.title("🚚 PRODE Última Milla Manager")
     st.subheader("Acceso al sistema")
 
     username = st.text_input("Usuario")
@@ -80,7 +69,6 @@ def pantalla_login():
 
     if st.button("Entrar"):
         ok, rol = validar_usuario(username, password)
-
         if ok:
             st.session_state["login"] = True
             st.session_state["usuario"] = username
@@ -90,35 +78,67 @@ def pantalla_login():
             st.error("Usuario o contraseña incorrectos")
 
 # -----------------------------------------
+# CARGAR PÁGINA
+# -----------------------------------------
+def cargar_pagina(nombre):
+    ruta = os.path.join("pages", nombre)
+    if not os.path.exists(ruta):
+        st.error(f"No existe la página: {nombre}")
+        return
+
+    with open(ruta, "r", encoding="utf-8") as f:
+        exec(f.read(), globals())
+
+# -----------------------------------------
 # MENÚ PRINCIPAL
 # -----------------------------------------
 def mostrar_paginas():
-    st.sidebar.title("Menú")
+    rol = st.session_state["rol"]
 
-    orden_menu = {
-        "9_Dashboard": "Dashboard",
-        "Empleados": "Empleados",
-        "6_EPIs": "EPIs",
-        "3_Servicios": "Servicios",
-        "4_Vehiculos": "Vehículos",
-        "8_Mantenimiento": "Mantenimiento",
-        "Documentacion": "Documentación",
-        "10_Papelera_Central": "Papelera Central",
-        "99_Papelera": "Papelera",
+    st.sidebar.title("🚚 PRODE Última Milla")
+
+    st.sidebar.subheader("Consulta")
+    menu_consulta = {
+        "Dashboard": "Dashboard.py",
+        "Ficha empleados": "Ficha_Empleados.py",
+        "Ficha vehículos": "Ficha_Vehiculos.py",
+        "Ficha servicios": "Ficha_Servicios.py",
+        "Ficha ausencias": "Ficha_Ausencias.py",
+        "Documentación": "Documentacion.py",
     }
 
-    seleccion = st.sidebar.radio("Ir a:", list(orden_menu.values()))
+    opcion = st.sidebar.radio(
+        "Ir a:",
+        list(menu_consulta.keys()),
+        key="menu_consulta"
+    )
 
-    archivo = [k for k, v in orden_menu.items() if v == seleccion][0] + ".py"
-    ruta = os.path.join("pages", archivo)
+    cargar_pagina(menu_consulta[opcion])
 
-    with open(ruta, "r", encoding="utf-8") as f:
-        code = f.read()
-        exec(code, globals())
+    if rol == "admin":
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("Gestión (Admin)")
 
-    st.sidebar.write("---")
-    st.sidebar.write(f"Usuario: **{st.session_state['usuario']}**")
-    st.sidebar.write(f"Rol: **{st.session_state['rol']}**")
+        menu_admin = {
+            "Administrar empleados": "Administrar_Empleados.py",
+            "Administrar vehículos": "Administrar_Vehiculos.py",
+            "Administrar servicios": "Administrar_Servicios.py",
+            "Administrar ausencias": "Administrar_Ausencias.py",
+            "Administrar mantenimiento": "Administrar_Mantenimiento.py",
+            "Papelera central": "Papelera_Central.py",
+        }
+
+        opcion_admin = st.sidebar.radio(
+            "Administrar:",
+            list(menu_admin.keys()),
+            key="menu_admin"
+        )
+
+        cargar_pagina(menu_admin[opcion_admin])
+
+    st.sidebar.markdown("---")
+    st.sidebar.write(f"👤 **Usuario:** {st.session_state['usuario']}")
+    st.sidebar.write(f"🔐 **Rol:** {rol}")
 
     if st.sidebar.button("Cerrar sesión"):
         st.session_state.clear()
@@ -127,7 +147,7 @@ def mostrar_paginas():
 # -----------------------------------------
 # CONTROL PRINCIPAL
 # -----------------------------------------
-if "login" not in st.session_state or st.session_state["login"] is not True:
+if "login" not in st.session_state or not st.session_state["login"]:
     pantalla_login()
 else:
     mostrar_paginas()
