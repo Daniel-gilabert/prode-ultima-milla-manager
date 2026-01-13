@@ -2,121 +2,64 @@ import streamlit as st
 import pandas as pd
 from pathlib import Path
 
-st.title("👤 Ficha de Empleados")
-
+# -----------------------------------------
+# CONFIG
+# -----------------------------------------
 DATA_FILE = Path("data/empleados.json")
 FOTOS_DIR = Path("data/fotos_empleados")
 
-# -----------------------------------------
-# ESTADO
-# -----------------------------------------
-if "modo_edicion" not in st.session_state:
-    st.session_state["modo_edicion"] = False
+st.title("👤 Ficha de Empleados")
 
 # -----------------------------------------
-# CARGA DATOS
+# CARGA SEGURA DE DATOS
 # -----------------------------------------
-if not DATA_FILE.exists():
-    st.warning("No hay empleados cargados.")
+if not DATA_FILE.exists() or DATA_FILE.stat().st_size == 0:
+    st.warning("⚠️ No hay empleados cargados en el sistema.")
     st.stop()
 
-df = pd.read_json(DATA_FILE).fillna("")
+try:
+    df = pd.read_json(DATA_FILE)
+except ValueError:
+    st.error("❌ El archivo empleados.json está corrupto.")
+    st.stop()
+
+df = df.fillna("")
+
+if "id_empleado" not in df.columns:
+    st.error("❌ Falta la columna id_empleado.")
+    st.stop()
+
 df["id_empleado"] = df["id_empleado"].astype(int)
 
 # -----------------------------------------
-# SELECCIÓN EMPLEADO
+# SELECTOR DE EMPLEADO
 # -----------------------------------------
-st.subheader("Selecciona un empleado")
+df["label"] = df["nombre"] + " (" + df["dni"] + ")"
 
-opciones = {
-    f"{row['nombre']} ({row['dni']})": row["id_empleado"]
-    for _, row in df.iterrows()
-}
+empleado_sel = st.selectbox(
+    "Selecciona un empleado",
+    df["label"].tolist()
+)
 
-label = st.selectbox("Empleado", list(opciones.keys()))
-id_empleado = opciones[label]
-
-empleado = df[df["id_empleado"] == id_empleado].iloc[0]
-
-st.divider()
-
-# -----------------------------------------
-# BOTÓN EDITAR (SOLO ADMIN)
-# -----------------------------------------
-if st.session_state.get("rol") == "admin":
-    if not st.session_state["modo_edicion"]:
-        if st.button("✏️ Editar datos"):
-            st.session_state["modo_edicion"] = True
-            st.rerun()
+empleado = df[df["label"] == empleado_sel].iloc[0]
 
 # -----------------------------------------
 # MODO EDICIÓN
 # -----------------------------------------
-if st.session_state["modo_edicion"]:
-
-    st.subheader("✏️ Editar ficha del empleado")
-
-    with st.form("editar_empleado"):
-        nombre = st.text_input("Nombre", empleado["nombre"])
-        dni = st.text_input("DNI", empleado["dni"])
-        email = st.text_input("Email", empleado["email"])
-        telefono = st.text_input("Teléfono", empleado["telefono"])
-        puesto = st.text_input("Puesto", empleado["puesto"])
-        ubicacion = st.text_input("Ubicación", empleado["ubicacion"])
-        estado = st.selectbox(
-            "Estado",
-            ["activo", "baja"],
-            index=0 if empleado["estado"] == "activo" else 1
-        )
-        observaciones = st.text_area(
-            "Observaciones",
-            empleado.get("observaciones", "")
-        )
-
-        guardar = st.form_submit_button("💾 Guardar cambios")
-        cancelar = st.form_submit_button("❌ Cancelar")
-
-    if cancelar:
-        st.session_state["modo_edicion"] = False
-        st.rerun()
-
-    if guardar:
-        df.loc[df["id_empleado"] == id_empleado, [
-            "nombre",
-            "dni",
-            "email",
-            "telefono",
-            "puesto",
-            "ubicacion",
-            "estado",
-            "observaciones"
-        ]] = [
-            nombre,
-            dni,
-            email,
-            telefono,
-            puesto,
-            ubicacion,
-            estado,
-            observaciones
-        ]
-
-        df.to_json(DATA_FILE, orient="records", indent=2, force_ascii=False)
-
-        st.success("✅ Cambios guardados correctamente")
-        st.session_state["modo_edicion"] = False
-        st.rerun()
+if "editando_empleado" not in st.session_state:
+    st.session_state.editando_empleado = False
 
 # -----------------------------------------
-# MODO FICHA NORMAL
+# VISTA NORMAL (FICHA)
 # -----------------------------------------
-else:
+if not st.session_state.editando_empleado:
+
     col_foto, col_info = st.columns([1, 3])
 
     with col_foto:
-        foto = FOTOS_DIR / f"{id_empleado}.jpg"
-        if foto.exists():
-            st.image(str(foto), width=150)
+        foto_path = FOTOS_DIR / f"{empleado['id_empleado']}.jpg"
+        if foto_path.exists():
+            st.image(str(foto_path), width=160)
         else:
             st.info("📷 Sin foto")
 
@@ -129,14 +72,62 @@ else:
         st.write(f"**Ubicación:** {empleado['ubicacion']}")
         st.write(f"**Estado:** {empleado['estado']}")
 
-        if empleado.get("observaciones"):
-            st.markdown("### 📝 Observaciones")
-            st.write(empleado["observaciones"])
-
     st.divider()
-    st.subheader("📦 EPIs")
-    st.info("EPIs se mostrarán aquí")
 
-    st.subheader("🚗 Vehículo asignado")
-    st.info("Vehículo se mostrará aquí")
+    # -------- BOTÓN EDITAR --------
+    if st.session_state.get("rol") == "admin":
+        if st.button("✏️ Editar ficha del empleado"):
+            st.session_state.editando_empleado = True
+            st.rerun()
+
+# -----------------------------------------
+# MODO EDICIÓN
+# -----------------------------------------
+else:
+    st.subheader("✏️ Editar ficha del empleado")
+
+    with st.form("form_editar_empleado"):
+
+        nombre = st.text_input("Nombre", empleado["nombre"])
+        dni = st.text_input("DNI", empleado["dni"])
+        email = st.text_input("Email", empleado["email"])
+        telefono = st.text_input("Teléfono", empleado["telefono"])
+        puesto = st.text_input("Puesto", empleado["puesto"])
+        ubicacion = st.text_input("Ubicación", empleado["ubicacion"])
+        estado = st.selectbox(
+            "Estado",
+            ["activo", "baja", "vacaciones"],
+            index=["activo", "baja", "vacaciones"].index(empleado["estado"])
+            if empleado["estado"] in ["activo", "baja", "vacaciones"] else 0
+        )
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            guardar = st.form_submit_button("💾 Guardar cambios")
+
+        with col2:
+            cancelar = st.form_submit_button("❌ Cancelar")
+
+    # -------- GUARDAR --------
+    if guardar:
+        df.loc[df["id_empleado"] == empleado["id_empleado"], [
+            "nombre", "dni", "email", "telefono",
+            "puesto", "ubicacion", "estado"
+        ]] = [
+            nombre, dni, email, telefono,
+            puesto, ubicacion, estado
+        ]
+
+        df.drop(columns=["label"], errors="ignore") \
+          .to_json(DATA_FILE, orient="records", indent=2, force_ascii=False)
+
+        st.success("✅ Ficha actualizada correctamente")
+        st.session_state.editando_empleado = False
+        st.rerun()
+
+    # -------- CANCELAR --------
+    if cancelar:
+        st.session_state.editando_empleado = False
+        st.rerun()
 
