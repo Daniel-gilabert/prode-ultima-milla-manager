@@ -62,18 +62,19 @@ with col_info:
 
 # ---------- FOTO ----------
 with col_foto:
-    foto_path = FOTOS_DIR / f"{veh['id_vehiculo']}.jpg"
+    fotos_dir = Path("data/fotos_vehiculos")
+    foto = None
 
-    if foto_path.exists():
-        st.image(
-            str(foto_path),
-            caption="Imagen del vehículo",
-            use_column_width=True
-        )
+    for ext in ["jpg", "jpeg", "png", "JPG", "JPEG", "PNG"]:
+        posible = fotos_dir / f"{veh['id_vehiculo']}.{ext}"
+        if posible.exists():
+            foto = posible
+            break
+
+    if foto:
+        st.image(str(foto), use_container_width=True)
     else:
         st.info("📷 Imagen del vehículo no disponible")
-
-st.markdown("---")
 
 # -----------------------------------------
 # EMPLEADO ASIGNADO
