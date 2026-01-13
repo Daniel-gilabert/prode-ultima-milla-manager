@@ -1,133 +1,94 @@
 import streamlit as st
 import pandas as pd
 from pathlib import Path
+from utils.storage import load_json
 
 # -----------------------------------------
-# CONFIG
+# CONFIGURACIÓN
 # -----------------------------------------
-DATA_FILE = Path("data/empleados.json")
+DATA_EMPLEADOS = "data/empleados.json"
 FOTOS_DIR = Path("data/fotos_empleados")
 
 st.title("👤 Ficha de Empleados")
 
 # -----------------------------------------
-# CARGA SEGURA DE DATOS
+# CARGA DE EMPLEADOS
 # -----------------------------------------
-if not DATA_FILE.exists() or DATA_FILE.stat().st_size == 0:
+empleados = load_json(DATA_EMPLEADOS, [])
+
+if not empleados:
     st.warning("⚠️ No hay empleados cargados en el sistema.")
     st.stop()
 
-try:
-    df = pd.read_json(DATA_FILE)
-except ValueError:
-    st.error("❌ El archivo empleados.json está corrupto.")
-    st.stop()
+df = pd.DataFrame(empleados).fillna("")
 
-df = df.fillna("")
-
-if "id_empleado" not in df.columns:
-    st.error("❌ Falta la columna id_empleado.")
-    st.stop()
-
-df["id_empleado"] = df["id_empleado"].astype(int)
+# Asegurar columnas mínimas
+for col in [
+    "id_empleado", "nombre", "dni", "email",
+    "telefono", "puesto", "ubicacion", "estado"
+]:
+    if col not in df.columns:
+        df[col] = ""
 
 # -----------------------------------------
 # SELECTOR DE EMPLEADO
 # -----------------------------------------
+st.subheader("Selecciona un empleado")
+
 df["label"] = df["nombre"] + " (" + df["dni"] + ")"
 
 empleado_sel = st.selectbox(
-    "Selecciona un empleado",
+    "Empleado",
     df["label"].tolist()
 )
 
-empleado = df[df["label"] == empleado_sel].iloc[0]
+emp = df[df["label"] == empleado_sel].iloc[0]
+
+st.markdown("---")
 
 # -----------------------------------------
-# MODO EDICIÓN
+# LAYOUT FOTO + DATOS
 # -----------------------------------------
-if "editando_empleado" not in st.session_state:
-    st.session_state.editando_empleado = False
+col_foto, col_info = st.columns([1, 3])
 
-# -----------------------------------------
-# VISTA NORMAL (FICHA)
-# -----------------------------------------
-if not st.session_state.editando_empleado:
+# ---------- FOTO ----------
+with col_foto:
+    foto_path = FOTOS_DIR / f"{emp['id_empleado']}.jpg"
 
-    col_foto, col_info = st.columns([1, 3])
-
-    with col_foto:
-        foto_path = FOTOS_DIR / f"{empleado['id_empleado']}.jpg"
-        if foto_path.exists():
-            st.image(str(foto_path), width=160)
-        else:
-            st.info("📷 Sin foto")
-
-    with col_info:
-        st.markdown(f"## {empleado['nombre']}")
-        st.write(f"**DNI:** {empleado['dni']}")
-        st.write(f"**Email:** {empleado['email']}")
-        st.write(f"**Teléfono:** {empleado['telefono']}")
-        st.write(f"**Puesto:** {empleado['puesto']}")
-        st.write(f"**Ubicación:** {empleado['ubicacion']}")
-        st.write(f"**Estado:** {empleado['estado']}")
-
-    st.divider()
-
-    # -------- BOTÓN EDITAR --------
-    if st.session_state.get("rol") == "admin":
-        if st.button("✏️ Editar ficha del empleado"):
-            st.session_state.editando_empleado = True
-            st.rerun()
-
-# -----------------------------------------
-# MODO EDICIÓN
-# -----------------------------------------
-else:
-    st.subheader("✏️ Editar ficha del empleado")
-
-    with st.form("form_editar_empleado"):
-
-        nombre = st.text_input("Nombre", empleado["nombre"])
-        dni = st.text_input("DNI", empleado["dni"])
-        email = st.text_input("Email", empleado["email"])
-        telefono = st.text_input("Teléfono", empleado["telefono"])
-        puesto = st.text_input("Puesto", empleado["puesto"])
-        ubicacion = st.text_input("Ubicación", empleado["ubicacion"])
-        estado = st.selectbox(
-            "Estado",
-            ["activo", "baja", "vacaciones"],
-            index=["activo", "baja", "vacaciones"].index(empleado["estado"])
-            if empleado["estado"] in ["activo", "baja", "vacaciones"] else 0
+    if foto_path.exists():
+        st.image(
+            str(foto_path),
+            caption="Foto del empleado",
+            width=150
         )
+    else:
+        st.info("📷 Sin foto")
 
-        col1, col2 = st.columns(2)
+# ---------- DATOS ----------
+with col_info:
+    st.markdown(f"## {emp['nombre']}")
+    st.write(f"**DNI:** {emp['dni']}")
+    st.write(f"**Email:** {emp['email']}")
+    st.write(f"**Teléfono:** {emp['telefono']}")
+    st.write(f"**Puesto:** {emp['puesto']}")
+    st.write(f"**Ubicación:** {emp['ubicacion']}")
+    st.write(f"**Estado:** {emp['estado']}")
 
-        with col1:
-            guardar = st.form_submit_button("💾 Guardar cambios")
+st.markdown("---")
 
-        with col2:
-            cancelar = st.form_submit_button("❌ Cancelar")
+# -----------------------------------------
+# BLOQUES FUTUROS (YA PREPARADOS)
+# -----------------------------------------
+st.subheader("🧰 EPIs")
+st.info("EPIs asociados al empleado (pendiente de implementación)")
 
-    # -------- GUARDAR --------
-    if guardar:
-        df.loc[df["id_empleado"] == empleado["id_empleado"], [
-            "nombre", "dni", "email", "telefono",
-            "puesto", "ubicacion", "estado"
-        ]] = [
-            nombre, dni, email, telefono,
-            puesto, ubicacion, estado
-        ]
+st.subheader("🩺 PRL y reconocimientos médicos")
+st.info("Cursos PRL, reconocimientos y documentación médica")
 
-        df.drop(columns=["label"], errors="ignore") \
-          .to_json(DATA_FILE, orient="records", indent=2, force_ascii=False)
+st.subheader("🚐 Vehículo asignado")
+vehiculo = emp.get("vehiculo_asignado", "")
 
-        st.success("✅ Ficha actualizada correctamente")
-        st.session_state.editando_empleado = False
-        st.rerun()
-
-    # -------- CANCELAR --------
-    if cancelar:
-        st.session_state.editando_empleado = False
-        st.rerun()
-
+if vehiculo:
+    st.success(f"Vehículo asignado: {vehiculo}")
+else:
+    st.info("No tiene vehículo asignado")
