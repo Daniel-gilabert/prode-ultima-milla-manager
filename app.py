@@ -2,6 +2,19 @@ import streamlit as st
 import pandas as pd
 import os
 from pathlib import Path
+import psycopg2
+import streamlit as st
+
+def get_connection():
+    return psycopg2.connect(st.secrets["DATABASE_URL"])
+
+try:
+    conn = get_connection()
+    st.success("Conexión a Supabase OK 🚀")
+    conn.close()
+except Exception as e:
+    st.error(f"Error de conexión: {e}")
+
 
 # -----------------------------------------
 # CONFIGURACIÓN GENERAL
