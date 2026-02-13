@@ -1,50 +1,41 @@
-import psycopg2
 import streamlit as st
+import pandas as pd
+import psycopg2
+
+# ---------------------------------------
+# CONEXIÓN
+# ---------------------------------------
 
 def get_connection():
     return psycopg2.connect(st.secrets["DATABASE_URL"])
 
-import streamlit as st
-import pandas as pd
-from pathlib import Path
-from utils.storage import load_json
-
-# -----------------------------------------
-# CONFIGURACIÓN
-# -----------------------------------------
-DATA_VEHICULOS = "data/vehiculos.json"
-FOTOS_DIR = Path("data/fotos_vehiculos")
-
 st.title("🚗 Ficha de Vehículos")
 
-# -----------------------------------------
-# CARGA DE VEHÍCULOS
-# -----------------------------------------
-vehiculos = load_json(DATA_VEHICULOS, [])
+# ---------------------------------------
+# CARGAR VEHÍCULOS DESDE SUPABASE
+# ---------------------------------------
 
-if not vehiculos:
+try:
+    conn = get_connection()
+    df = pd.read_sql("SELECT * FROM vehiculos ORDER BY matricula", conn)
+    conn.close()
+
+except Exception as e:
+    st.error(f"Error cargando vehículos: {e}")
+    st.stop()
+
+if df.empty:
     st.warning("⚠️ No hay vehículos cargados en el sistema.")
     st.stop()
 
-df = pd.DataFrame(vehiculos).fillna("")
+# ---------------------------------------
+# SELECTOR
+# ---------------------------------------
 
-# Asegurar columnas mínimas
-for col in [
-    "id_vehiculo", "matricula", "marca", "modelo",
-    "tipo", "estado", "bastidor", "empleado_asignado"
-]:
-    if col not in df.columns:
-        df[col] = ""
-
-# -----------------------------------------
-# SELECTOR DE VEHÍCULO
-# -----------------------------------------
-st.subheader("Selecciona un vehículo")
-
-df["label"] = df["id_vehiculo"].astype(str) + " - " + df["matricula"]
+df["label"] = df["matricula"]
 
 vehiculo_sel = st.selectbox(
-    "Vehículo",
+    "Selecciona un vehículo",
     df["label"].tolist()
 )
 
@@ -52,51 +43,22 @@ veh = df[df["label"] == vehiculo_sel].iloc[0]
 
 st.markdown("---")
 
-# -----------------------------------------
-# LAYOUT FOTO + DATOS
-# -----------------------------------------
-col_info, col_foto = st.columns([3, 2])
+# ---------------------------------------
+# DATOS
+# ---------------------------------------
 
-# ---------- DATOS ----------
-with col_info:
-    st.markdown(f"## {veh['matricula']}")
+st.subheader("Información del vehículo")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    st.write(f"**Matrícula:** {veh['matricula']}")
     st.write(f"**Marca:** {veh['marca']}")
     st.write(f"**Modelo:** {veh['modelo']}")
     st.write(f"**Tipo:** {veh['tipo']}")
-    st.write(f"**Estado:** {veh['estado']}")
     st.write(f"**Bastidor:** {veh['bastidor']}")
 
-# ---------- FOTO ----------
-with col_foto:
-    fotos_dir = Path("data/fotos_vehiculos")
-    foto = None
+with col2:
+    st.write(f"**ITV vigente hasta:** {veh['itv_vigente_hasta']}")
+    st.write(f"**Seguro**
 
-    for ext in ["jpg", "jpeg", "png", "JPG", "JPEG", "PNG"]:
-        posible = fotos_dir / f"{veh['id_vehiculo']}.{ext}"
-        if posible.exists():
-            foto = posible
-            break
-
-    if foto:
-        st.image(str(foto), use_container_width=True)
-    else:
-        st.info("📷 Imagen del vehículo no disponible")
-
-# -----------------------------------------
-# EMPLEADO ASIGNADO
-# -----------------------------------------
-st.subheader("👤 Empleado asignado")
-
-if veh["empleado_asignado"]:
-    st.success(f"Asignado a: {veh['empleado_asignado']}")
-else:
-    st.info("No asignado a ningún empleado")
-
-# -----------------------------------------
-# BLOQUES FUTUROS (PREPARADOS)
-# -----------------------------------------
-st.subheader("🛠️ Mantenimiento")
-st.info("Historial de mantenimientos (pendiente de implementación)")
-
-st.subheader("📄 Documentación")
-st.info("ITV, seguro, revisiones, etc.")
