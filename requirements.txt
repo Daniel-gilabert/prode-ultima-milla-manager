@@ -5,9 +5,4 @@ pillow
 python-dateutil
 reportlab
 openpyxl
-try:
-    conn = get_connection()
-    st.success("Conexión a Supabase OK 🚀")
-    conn.close()
-except Exception as e:
-    st.error(f"Error de conexión: {e}")
+psycopg2-binary
