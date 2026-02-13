@@ -1,10 +1,20 @@
 import streamlit as st
 import pandas as pd
-import os
 from pathlib import Path
 import psycopg2
-import streamlit as st
 
+# -----------------------------------------
+# CONFIGURACIÓN GENERAL (SIEMPRE LO PRIMERO)
+# -----------------------------------------
+st.set_page_config(
+    page_title="PRODE Última Milla Manager",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+# -----------------------------------------
+# CONEXIÓN A SUPABASE (TEST)
+# -----------------------------------------
 def get_connection():
     return psycopg2.connect(st.secrets["DATABASE_URL"])
 
@@ -15,29 +25,18 @@ try:
 except Exception as e:
     st.error(f"Error de conexión: {e}")
 
+# -----------------------------------------
+# OCULTAR MENÚ AUTOMÁTICO SOLO SI NO LOGUEADO
+# -----------------------------------------
+if "login" not in st.session_state:
+    st.markdown("""
+    <style>
+    [data-testid="stSidebarNav"] {display: none;}
+    </style>
+    """, unsafe_allow_html=True)
 
 # -----------------------------------------
-# CONFIGURACIÓN GENERAL
-# -----------------------------------------
-st.set_page_config(
-    page_title="PRODE Última Milla Manager",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
-
-# -----------------------------------------
-# OCULTAR MENÚ AUTOMÁTICO DE STREAMLIT (CLAVE)
-# -----------------------------------------
-st.markdown("""
-<style>
-[data-testid="stSidebarNav"] {
-    display: none;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# -----------------------------------------
-# CARGA DE USUARIOS (ROBUSTA)
+# CARGA DE USUARIOS
 # -----------------------------------------
 def load_users():
     path = Path("data/usuarios.csv")
@@ -62,10 +61,6 @@ def load_users():
 # -----------------------------------------
 def validar_usuario(username, password):
     df = load_users()
-
-    for col in ["username", "password", "rol"]:
-        if col not in df.columns:
-            df[col] = ""
 
     df["username"] = df["username"].astype(str).str.strip()
     df["password"] = df["password"].astype(str).str.strip()
@@ -94,94 +89,16 @@ def pantalla_login():
             st.session_state["login"] = True
             st.session_state["usuario"] = username
             st.session_state["rol"] = rol
-            st.session_state["pagina_actual"] = "Dashboard"
             st.rerun()
         else:
             st.error("Usuario o contraseña incorrectos")
 
 # -----------------------------------------
-# NAVEGACIÓN PRINCIPAL
+# CONTROL PRINCIPAL
 # -----------------------------------------
-def mostrar_paginas():
-
-    # Página activa (UNA SOLA SIEMPRE)
-    if "pagina_actual" not in st.session_state:
-        st.session_state["pagina_actual"] = "Dashboard"
-
-    # ---------------- CONSULTA ----------------
-    st.sidebar.markdown("## 📊 Consulta")
-
-    consulta_paginas = {
-        "Dashboard": "Dashboard.py",
-        "Ficha empleados": "Ficha_Empleados.py",
-        "Ficha vehículos": "Ficha_Vehiculos.py",
-        "Ficha servicios": "Ficha_Servicios.py",
-        "Ficha ausencias": "Ficha_Ausencias.py",
-        "Documentación": "Documentacion.py",
-    }
-
-    consulta_keys = list(consulta_paginas.keys())
-    consulta_index = (
-        consulta_keys.index(st.session_state["pagina_actual"])
-        if st.session_state["pagina_actual"] in consulta_keys else 0
-    )
-
-    seleccion_consulta = st.sidebar.radio(
-        "Ir a:",
-        consulta_keys,
-        index=consulta_index,
-        key="menu_consulta"
-    )
-
-    st.session_state["pagina_actual"] = seleccion_consulta
-
-    # ---------------- GESTIÓN (ADMIN) ----------------
-    admin_paginas = {}
-    if st.session_state["rol"] == "admin":
-        st.sidebar.markdown("---")
-        st.sidebar.markdown("## 🛠️ Gestión (Admin)")
-
-        admin_paginas = {
-            "Administrar empleados": "Administrar_Empleados.py",
-            "Administrar vehículos": "Administrar_Vehiculos.py",
-            "Administrar servicios": "Administrar_Servicios.py",
-            "Administrar ausencias": "Administrar_Ausencias.py",
-            "Administrar mantenimiento": "Administrar_Mantenimiento.py",
-            "Papelera central": "Papelera_Central.py",
-        }
-
-        admin_keys = list(admin_paginas.keys())
-        admin_index = (
-            admin_keys.index(st.session_state["pagina_actual"])
-            if st.session_state["pagina_actual"] in admin_keys else -1
-        )
-
-        seleccion_admin = st.sidebar.radio(
-            "Administrar:",
-            ["—"] + admin_keys,
-            index=admin_index + 1 if admin_index >= 0 else 0,
-            key="menu_admin"
-        )
-
-        if seleccion_admin != "—":
-            st.session_state["pagina_actual"] = seleccion_admin
-
-    # ---------------- CARGA DE LA PÁGINA ----------------
-    pagina = st.session_state["pagina_actual"]
-
-    archivo = (
-        consulta_paginas.get(pagina)
-        or admin_paginas.get(pagina)
-    )
-
-    if archivo:
-        ruta = os.path.join("pages", archivo)
-        if os.path.exists(ruta):
-            exec(open(ruta, encoding="utf-8").read(), globals())
-        else:
-            st.error(f"No existe la página: {archivo}")
-
-    # ---------------- INFO USUARIO ----------------
+if "login" not in st.session_state or st.session_state["login"] is not True:
+    pantalla_login()
+else:
     st.sidebar.markdown("---")
     st.sidebar.write(f"👤 Usuario: **{st.session_state['usuario']}**")
     st.sidebar.write(f"🔐 Rol: **{st.session_state['rol']}**")
@@ -190,10 +107,6 @@ def mostrar_paginas():
         st.session_state.clear()
         st.rerun()
 
-# -----------------------------------------
-# CONTROL PRINCIPAL
-# -----------------------------------------
-if "login" not in st.session_state or st.session_state["login"] is not True:
-    pantalla_login()
-else:
-    mostrar_paginas()
+    st.title("📊 Dashboard")
+    st.write("Selecciona una página desde el menú lateral.")
+
