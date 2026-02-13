@@ -33,7 +33,7 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.write("Matricula:", veh["matricula"])
-    st.write("Marca:", veh["marca"])
+    st.write("Marca:", v["marca"])
     st.write("Modelo:", veh["modelo"])
     st.write("Tipo:", veh["tipo"])
     st.write("Bastidor:", veh["bastidor"])
