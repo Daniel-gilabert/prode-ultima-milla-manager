@@ -1,137 +1,59 @@
 import streamlit as st
 import pandas as pd
-import json
-from pathlib import Path
+import psycopg2
 
-# --------------------------------------------------
-# CONFIGURACIÓN
-# --------------------------------------------------
-st.set_page_config(page_title="Administrar Vehículos", layout="wide")
-st.title("🚗 Administrar Vehículos")
-st.write("Sube el Excel de vehículos")
+def get_connection():
+    return psycopg2.connect(st.secrets["DATABASE_URL"])
 
-DATA_DIR = Path("data")
-DATA_DIR.mkdir(exist_ok=True)
+st.title("📥 Importar Vehículos desde Excel")
 
-VEH_FILE = DATA_DIR / "vehiculos.json"
+archivo = st.file_uploader("Sube el Excel de vehículos", type=["xlsx"])
 
-# --------------------------------------------------
-# SUBIDA DE EXCEL
-# --------------------------------------------------
-archivo = st.file_uploader(
-    "Sube el Excel de vehículos",
-    type=["xlsx"]
-)
-
-if archivo is None:
-    st.info("⬆️ Sube un archivo Excel para comenzar")
-    st.stop()
-
-# --------------------------------------------------
-# LECTURA DEL EXCEL
-# --------------------------------------------------
-try:
+if archivo:
     df = pd.read_excel(archivo)
-except Exception as e:
-    st.error("❌ Error al leer el Excel")
-    st.exception(e)
-    st.stop()
 
-# --------------------------------------------------
-# NORMALIZAR COLUMNAS
-# --------------------------------------------------
-df.columns = (
-    df.columns
-    .str.lower()
-    .str.strip()
-    .str.replace("á", "a")
-    .str.replace("é", "e")
-    .str.replace("í", "i")
-    .str.replace("ó", "o")
-    .str.replace("ú", "u")
-    .str.replace(" ", "_")
-)
+    # Limpieza básica
+    df["matricula"] = df["matricula"].astype(str).str.strip()
 
-# --------------------------------------------------
-# COLUMNAS OBLIGATORIAS
-# --------------------------------------------------
-columnas_obligatorias = {
-    "id_vehiculo",
-    "matricula",
-    "bastidor",
-    "marca",
-    "modelo",
-    "tipo",
-}
+    conn = get_connection()
+    cursor = conn.cursor()
 
-faltan = columnas_obligatorias - set(df.columns)
-if faltan:
-    st.error("❌ Faltan columnas obligatorias")
-    st.write(list(faltan))
-    st.stop()
+    inserted = 0
+    updated = 0
 
-# --------------------------------------------------
-# LIMPIEZA DE DATOS
-# --------------------------------------------------
+    for _, row in df.iterrows():
+        cursor.execute("""
+        INSERT INTO vehiculos (
+            id_vehiculo, matricula, bastidor, marca, modelo,
+            tipo, itv_vigente_hasta, seguro_vigente_hasta,
+            aseguradora, poliza
+        )
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        ON CONFLICT (matricula)
+        DO UPDATE SET
+            bastidor = EXCLUDED.bastidor,
+            marca = EXCLUDED.marca,
+            modelo = EXCLUDED.modelo,
+            tipo = EXCLUDED.tipo,
+            itv_vigente_hasta = EXCLUDED.itv_vigente_hasta,
+            seguro_vigente_hasta = EXCLUDED.seguro_vigente_hasta,
+            aseguradora = EXCLUDED.aseguradora,
+            poliza = EXCLUDED.poliza;
+        """, (
+            row.get("id_vehiculo"),
+            row.get("matricula"),
+            row.get("bastidor"),
+            row.get("marca"),
+            row.get("modelo"),
+            row.get("tipo"),
+            row.get("itv_vigente_hasta"),
+            row.get("seguro_vigente_hasta"),
+            row.get("aseguradora"),
+            row.get("poliza")
+        ))
 
-# id_vehiculo → permitir vacío
-df["id_vehiculo"] = (
-    df["id_vehiculo"]
-    .astype(str)
-    .str.strip()
-    .replace("", None)
-)
+    conn.commit()
+    cursor.close()
+    conn.close()
 
-# tipo → normalizar y validar
-df["tipo"] = df["tipo"].astype(str).str.lower().str.strip()
-
-valores_validos_tipo = {"propiedad", "renting"}
-tipos_invalidos = df.loc[~df["tipo"].isin(valores_validos_tipo), "tipo"].unique()
-
-if len(tipos_invalidos) > 0:
-    st.error("❌ Valores incorrectos en columna 'tipo'")
-    st.write("Solo se permite: propiedad / renting")
-    st.json(tipos_invalidos.tolist())
-    st.stop()
-
-# --------------------------------------------------
-# AÑADIR CAMPOS INTERNOS DEL SISTEMA
-# --------------------------------------------------
-df["estado"] = "OPERATIVO"               # editable luego desde ficha
-df["empleado_id"] = None                 # asignación posterior
-df["itv_cita_fecha"] = None
-df["itv_estacion"] = None
-df["seguro_aseguradora"] = None
-df["seguro_poliza"] = None
-
-# --------------------------------------------------
-# MOSTRAR PREVISUALIZACIÓN
-# --------------------------------------------------
-st.success("✅ Excel válido")
-st.dataframe(df, use_container_width=True)
-
-# --------------------------------------------------
-# GUARDAR EN JSON
-# --------------------------------------------------
-if st.button("💾 Guardar vehículos en el sistema"):
-    try:
-        vehiculos = df.to_dict(orient="records")
-
-        with open(VEH_FILE, "w", encoding="utf-8") as f:
-            json.dump(vehiculos, f, indent=2, ensure_ascii=False)
-
-        st.success("🚗 Vehículos guardados correctamente")
-        st.info("Estado inicial asignado: OPERATIVO")
-
-    except Exception as e:
-        st.error("❌ Error al guardar vehículos")
-        st.exception(e)
-
-# --------------------------------------------------
-# COMPROBACIÓN
-# --------------------------------------------------
-if VEH_FILE.exists():
-    st.success("📄 vehiculos.json EXISTE en el sistema")
-else:
-    st.warning("📄 vehiculos.json todavía NO existe")
-
+    st.success("Importación completada 🚀")
