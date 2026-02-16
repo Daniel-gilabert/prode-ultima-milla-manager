@@ -21,6 +21,7 @@ except Exception as e:
 
 if df.empty:
     st.warning("No hay vehículos cargados en el sistema.")
+    st.stop()
 
 # ==========================
 # BOTONES SUPERIORES
@@ -38,14 +39,16 @@ with col_btn2:
 # ==========================
 # SELECCIÓN VEHÍCULO
 # ==========================
+if "vehiculo_index" not in st.session_state:
+    st.session_state["vehiculo_index"] = 0
+
 vehiculo_sel = st.selectbox(
     "Selecciona un vehículo",
-    df["matricula"].tolist() if not df.empty else []
+    df["matricula"].tolist(),
+    index=st.session_state["vehiculo_index"]
 )
 
-veh = None
-if vehiculo_sel:
-    veh = df[df["matricula"] == vehiculo_sel].iloc[0]
+veh = df[df["matricula"] == vehiculo_sel].iloc[0]
 
 st.markdown("---")
 
@@ -70,7 +73,14 @@ if st.session_state.get("modo") == "nuevo":
         aseguradora = st.text_input("Aseguradora")
         poliza = st.text_input("Póliza")
 
-        guardar = st.form_submit_button("Guardar vehículo")
+        col_save, col_cancel = st.columns(2)
+        guardar = col_save.form_submit_button("Guardar vehículo")
+        cancelar = col_cancel.form_submit_button("Cancelar")
+
+    if cancelar:
+        st.session_state["modo"] = None
+        st.session_state["vehiculo_index"] = 0
+        st.rerun()
 
     if guardar:
         try:
@@ -96,6 +106,7 @@ if st.session_state.get("modo") == "nuevo":
 
             st.success("Vehículo añadido correctamente ✅")
             st.session_state["modo"] = None
+            st.session_state["vehiculo_index"] = 0
             st.rerun()
 
         except Exception as e:
@@ -104,7 +115,7 @@ if st.session_state.get("modo") == "nuevo":
 # ==========================
 # MODO EDITAR
 # ==========================
-elif st.session_state.get("modo") == "editar" and veh is not None:
+elif st.session_state.get("modo") == "editar":
 
     st.subheader("✏ Editar vehículo")
 
@@ -129,7 +140,14 @@ elif st.session_state.get("modo") == "editar" and veh is not None:
         aseguradora = st.text_input("Aseguradora", veh["aseguradora"])
         poliza = st.text_input("Póliza", veh["poliza"])
 
-        guardar = st.form_submit_button("Guardar cambios")
+        col_save, col_cancel = st.columns(2)
+        guardar = col_save.form_submit_button("Guardar cambios")
+        cancelar = col_cancel.form_submit_button("Cancelar")
+
+    if cancelar:
+        st.session_state["modo"] = None
+        st.session_state["vehiculo_index"] = 0
+        st.rerun()
 
     if guardar:
         try:
@@ -166,6 +184,7 @@ elif st.session_state.get("modo") == "editar" and veh is not None:
 
             st.success("Vehículo actualizado correctamente ✅")
             st.session_state["modo"] = None
+            st.session_state["vehiculo_index"] = 0
             st.rerun()
 
         except Exception as e:
@@ -174,7 +193,7 @@ elif st.session_state.get("modo") == "editar" and veh is not None:
 # ==========================
 # VISTA NORMAL
 # ==========================
-elif veh is not None:
+else:
 
     st.subheader("📋 Información del vehículo")
 
@@ -192,5 +211,6 @@ elif veh is not None:
         st.write("Seguro vigente hasta:", veh["seguro_vigente_hasta"])
         st.write("Aseguradora:", veh["aseguradora"])
         st.write("Póliza:", veh["poliza"])
+
 
 
