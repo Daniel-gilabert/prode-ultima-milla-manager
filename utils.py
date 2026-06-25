@@ -243,10 +243,10 @@ def query(sql: str, params=None):
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(sql, params)
             return [dict(r) for r in cur.fetchall()]
-    except Exception:
+    except Exception as e:
+        st.error(f"ERROR SQL: {e}")
         get_conn.clear()
         return []
-
 def execute(sql: str, params=None) -> bool:
     """Ejecuta INSERT/UPDATE/DELETE. Devuelve True si OK."""
     conn = get_conn()
