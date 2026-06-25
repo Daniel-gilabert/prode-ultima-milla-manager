@@ -236,7 +236,7 @@ header[data-testid="stHeader"] { background: transparent !important; }
 def get_conn():
     return psycopg2.connect(st.secrets["DATABASE_URL"], connect_timeout=8)
 
-def query(sql: str, params=None) -> list[dict]:
+def query(sql: str, params=None):
     """Ejecuta SELECT y devuelve lista de dicts."""
     conn = get_conn()
     try:
@@ -380,4 +380,3 @@ def back_button(label: str = "← Volver"):
     clicked = st.button(label)
     st.markdown("</div>", unsafe_allow_html=True)
     return clicked
-utils.py
