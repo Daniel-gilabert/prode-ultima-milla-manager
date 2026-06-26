@@ -4,19 +4,6 @@ from utils import query, execute, page_header, back_button, badge
 import datetime
 import json
 
-# ─────────────────────────────────────────────
-# IMÁGENES GENÉRICAS POR MARCA
-# Las URLs son imágenes públicas de ejemplo.
-# Para añadir una marca nueva: ve a "⚙️ Gestionar marcas" en la lista de vehículos.
-# Las marcas personalizadas se guardan en st.session_state["marcas_extra"].
-# ─────────────────────────────────────────────
-MARCAS_DEFAULT = {
-    "paxter":  "https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/PNG_transparency_demonstration_1.png/240px-PNG_transparency_demonstration_1.png",
-    "scoobic": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/PNG_transparency_demonstration_1.png/240px-PNG_transparency_demonstration_1.png",
-    "renault": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/PNG_transparency_demonstration_1.png/240px-PNG_transparency_demonstration_1.png",
-}
-
-# Emojis representativos por marca mientras no haya foto real
 MARCA_EMOJI = {
     "paxter":  "🛵",
     "scoobic": "🛺",
@@ -38,7 +25,6 @@ ESTADO_OPTS = ["✅ Correcto", "⚠️ Revisar", "❌ Defecto"]
 
 
 def get_marcas():
-    """Devuelve lista de marcas disponibles (default + añadidas por usuario)."""
     extra = st.session_state.get("marcas_extra", [])
     base  = ["Paxter", "Scoobic", "Renault"]
     return base + [m for m in extra if m not in base]
@@ -48,14 +34,10 @@ def get_emoji(marca: str) -> str:
     return MARCA_EMOJI.get(marca.lower().strip(), "🚛")
 
 
-# ─────────────────────────────────────────────
-# CHECK-IN
-# ─────────────────────────────────────────────
 def tab_checkin(veh_id: int, matricula: str):
     st.markdown("### 📋 Registro de estado del vehículo")
-    st.caption("Rellena el estado actual. Puedes subir fotos por cada punto.")
+    st.caption("Rellena el estado actual. Puedes subir fotos.")
 
-    # Historial de check-ins anteriores
     historico = query("""
         SELECT fecha, responsable, estado_json, observaciones
         FROM checkins_vehiculo
@@ -76,7 +58,7 @@ def tab_checkin(veh_id: int, matricula: str):
                 st.markdown("---")
 
     st.markdown("#### ➕ Nuevo check-in")
-    responsable = st.text_input("Responsable del check-in",
+    responsable = st.text_input("Responsable",
                                 value=st.session_state.get("usuario", ""))
 
     estado_resultado = {}
@@ -91,7 +73,7 @@ def tab_checkin(veh_id: int, matricula: str):
 
     st.markdown("#### 📸 Fotos del estado")
     fotos = st.file_uploader(
-        "Sube fotos del vehículo (puedes subir varias)",
+        "Sube fotos del vehículo",
         type=["jpg", "jpeg", "png"],
         accept_multiple_files=True,
         key=f"fotos_{veh_id}"
@@ -99,12 +81,10 @@ def tab_checkin(veh_id: int, matricula: str):
     if fotos:
         cols_fotos = st.columns(min(len(fotos), 4))
         for i, foto in enumerate(fotos):
-            cols_fotos[i % 4].image(foto, use_column_width=True,
-                                     caption=foto.name)
+            cols_fotos[i % 4].image(foto, use_column_width=True, caption=foto.name)
 
     if st.button("💾 Guardar check-in", key=f"save_chk_{veh_id}",
                  use_container_width=True):
-        # Intentar guardar en tabla checkins_vehiculo si existe
         ok = execute("""
             INSERT INTO checkins_vehiculo
             (vehiculo_id, fecha, responsable, estado_json, observaciones)
@@ -115,27 +95,17 @@ def tab_checkin(veh_id: int, matricula: str):
             st.success("✅ Check-in registrado correctamente.")
             st.rerun()
         else:
-            # Si la tabla no existe todavía, mostrar resumen igualmente
-            st.warning(
-                "⚠️ La tabla `checkins_vehiculo` no existe aún en Supabase. "
-                "Créala con esta SQL y vuelve a intentarlo:"
-            )
+            st.warning("⚠️ Crea la tabla primero en Supabase:")
             st.code("""
 CREATE TABLE checkins_vehiculo (
-  id              SERIAL PRIMARY KEY,
-  vehiculo_id     INT REFERENCES vehiculos(id),
-  fecha           DATE NOT NULL DEFAULT CURRENT_DATE,
-  responsable     TEXT,
-  estado_json     TEXT,
-  observaciones   TEXT,
-  created_at      TIMESTAMPTZ DEFAULT NOW()
-);
-            """, language="sql")
-
-
-# ─────────────────────────────────────────────
-# FICHA DE VEHÍCULO
-# ─────────────────────────────────────────────
+  id            SERIAL PRIMARY KEY,
+  vehiculo_id   INT REFERENCES vehiculos(id),
+  fecha         DATE NOT NULL DEFAULT CURRENT_DATE,
+  responsable   TEXT,
+  estado_json   TEXT,
+  observaciones TEXT,
+  created_at    TIMESTAMPTZ DEFAULT NOW()
+);""", language="sql")
 def ficha_vehiculo(veh_id: int):
     rows = query("SELECT * FROM vehiculos WHERE id = %s", (veh_id,))
     if not rows:
@@ -186,15 +156,12 @@ def ficha_vehiculo(veh_id: int):
     st.markdown("---")
 
     tab_datos, tab_checkin_t, tab_empleados = st.tabs([
-        "🔧 Datos del vehículo",
-        "📋 Check-in de estado",
-        "👥 Empleados asignados"
+        "🔧 Datos del vehículo", "📋 Check-in de estado", "👥 Empleados asignados"
     ])
 
     with tab_datos:
-        marcas_disp = get_marcas()
+        marcas_disp  = get_marcas()
         marca_actual = marca if marca in marcas_disp else marcas_disp[0]
-
         c1, c2 = st.columns(2)
         with c1:
             matricula   = st.text_input("Matrícula",  value=v.get("matricula",""))
@@ -206,11 +173,9 @@ def ficha_vehiculo(veh_id: int):
         with c2:
             tipo        = st.selectbox("Tipo", ["renting","propiedad"],
                                        index=0 if v.get("tipo","renting")=="renting" else 1)
-            itv_v       = st.date_input("ITV vigente hasta",
-                                        value=itv_fecha or hoy)
+            itv_v       = st.date_input("ITV vigente hasta", value=itv_fecha or hoy)
             aseguradora = st.text_input("Aseguradora", value=v.get("aseguradora","") or "")
             poliza      = st.text_input("Póliza",      value=v.get("poliza","") or "")
-
         if st.button("💾 Guardar cambios", key="save_veh"):
             ok = execute("""
                 UPDATE vehiculos
@@ -229,8 +194,8 @@ def ficha_vehiculo(veh_id: int):
         emp_rows = query("""
             SELECT DISTINCT e.id, e.nombre, e.apellidos, e.email
             FROM servicios s
-            JOIN empleados e ON e.id = s.empleado_id
-            WHERE s.vehiculo_id = %s
+            JOIN empleados e ON e.id = s.empleado_base_id
+            WHERE s.vehiculo_base_id = %s
             ORDER BY e.apellidos
         """, (veh_id,))
         if emp_rows:
@@ -249,9 +214,6 @@ def ficha_vehiculo(veh_id: int):
             st.info("Ningún empleado asignado a este vehículo en servicios.")
 
 
-# ─────────────────────────────────────────────
-# LISTA DE VEHÍCULOS
-# ─────────────────────────────────────────────
 def lista_vehiculos():
     page_header("🚛", "Vehículos")
     hoy = datetime.date.today()
@@ -270,17 +232,12 @@ def lista_vehiculos():
         if st.button("⚙️ Gestionar marcas", use_container_width=True):
             st.session_state["gestionar_marcas"] = not st.session_state.get("gestionar_marcas", False)
 
-    # ── Panel gestión de marcas ──
     if st.session_state.get("gestionar_marcas"):
         with st.expander("⚙️ Marcas disponibles", expanded=True):
-            marcas_actuales = get_marcas()
-            st.markdown("**Marcas actuales:**")
-            for m in marcas_actuales:
+            for m in get_marcas():
                 st.markdown(f"- {get_emoji(m)} {m}")
             st.markdown("---")
-            nueva_marca = st.text_input("Añadir nueva marca",
-                                        placeholder="Ej: Citroën, Ford…",
-                                        key="input_nueva_marca")
+            nueva_marca = st.text_input("Añadir nueva marca", key="input_nueva_marca")
             if st.button("Añadir marca", key="btn_add_marca"):
                 if nueva_marca.strip():
                     extra = st.session_state.get("marcas_extra", [])
@@ -290,16 +247,14 @@ def lista_vehiculos():
                         st.success(f"Marca '{nueva_marca}' añadida.")
                         st.rerun()
 
-    # ── Formulario nuevo vehículo ──
     if st.session_state.get("nuevo_vehiculo"):
         with st.expander("➕ Nuevo vehículo", expanded=True):
-            marcas_disp = get_marcas()
             with st.form("form_nuevo_veh"):
                 c1, c2 = st.columns(2)
                 with c1:
                     n_mat  = st.text_input("Matrícula *")
                     n_bast = st.text_input("Bastidor")
-                    n_marc = st.selectbox("Marca *", marcas_disp)
+                    n_marc = st.selectbox("Marca *", get_marcas())
                     n_mod  = st.text_input("Modelo")
                 with c2:
                     n_tipo = st.selectbox("Tipo", ["renting","propiedad"])
@@ -307,25 +262,22 @@ def lista_vehiculos():
                     n_seg  = st.date_input("Seguro vigente hasta", value=hoy)
                     n_aseg = st.text_input("Aseguradora")
                     n_pol  = st.text_input("Póliza")
-                sub = st.form_submit_button("✅ Crear vehículo", use_container_width=True)
-                if sub:
+                if st.form_submit_button("✅ Crear vehículo", use_container_width=True):
                     if not n_mat:
                         st.warning("La matrícula es obligatoria.")
                     else:
                         ok = execute("""
                             INSERT INTO vehiculos
                             (matricula, bastidor, marca, modelo, tipo,
-                             itv_vigente_hasta, seguro_vigente_hasta,
-                             aseguradora, poliza)
+                             itv_vigente_hasta, seguro_vigente_hasta, aseguradora, poliza)
                             VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
                         """, (n_mat, n_bast, n_marc, n_mod, n_tipo,
                               n_itv, n_seg, n_aseg, n_pol))
                         if ok:
-                            st.success(f"Vehículo {n_mat} creado correctamente.")
+                            st.success(f"Vehículo {n_mat} creado.")
                             st.session_state["nuevo_vehiculo"] = False
                             st.rerun()
 
-    # ── Filtros BD ──
     where, params = [], []
     if buscar:
         where.append("(matricula ILIKE %s OR marca ILIKE %s OR modelo ILIKE %s)")
@@ -345,34 +297,22 @@ def lista_vehiculos():
     st.markdown("---")
 
     for v in vehiculos:
-        itv_v  = v.get("itv_vigente_hasta")
-        marca  = v.get("marca","")
-        emoji  = get_emoji(marca)
-
-        if itv_v and itv_v <= hoy:
-            alerta = "🔴"
-        elif itv_v and (itv_v - hoy).days <= 30:
-            alerta = "🟡"
-        else:
-            alerta = "🟢"
-
-        tipo_b = badge(v.get("tipo","—"),
-                       "orange" if v.get("tipo") == "renting" else "blue")
+        itv_v = v.get("itv_vigente_hasta")
+        marca = v.get("marca","")
+        emoji = get_emoji(marca)
+        alerta = "🔴" if itv_v and itv_v <= hoy else ("🟡" if itv_v and (itv_v - hoy).days <= 30 else "🟢")
+        tipo_b = badge(v.get("tipo","—"), "orange" if v.get("tipo") == "renting" else "blue")
 
         col_main, col_act = st.columns([5, 0.8])
         with col_main:
             st.markdown(f"""
             <div class="row-card">
-                <div class="row-avatar"
-                     style="background:rgba(27,58,107,0.08);
-                            color:#1B3A6B;font-size:1.6rem;
-                            width:48px;height:48px;">
+                <div class="row-avatar" style="background:rgba(27,58,107,0.08);
+                     color:#1B3A6B;font-size:1.6rem;width:48px;height:48px;">
                     {emoji}
                 </div>
                 <div>
-                    <div class="row-name">
-                        {v.get('matricula','—')} &nbsp; {tipo_b}
-                    </div>
+                    <div class="row-name">{v.get('matricula','—')} &nbsp; {tipo_b}</div>
                     <div class="row-sub">
                         {marca} {v.get('modelo','—')}
                         &nbsp;|&nbsp; ITV: {alerta} {itv_v or '—'}
@@ -387,11 +327,8 @@ def lista_vehiculos():
                 st.rerun()
 
 
-# ─────────────────────────────────────────────
-# ENTRY POINT
-# ─────────────────────────────────────────────
 def render():
     if st.session_state.get("selected_vehiculo"):
         ficha_vehiculo(st.session_state["selected_vehiculo"])
     else:
-        lista_vehiculos()
+        lista_vehiculos()            
