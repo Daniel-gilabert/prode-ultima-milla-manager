@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PRODE · Check-in Vehículo</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #F0F2F6;
+    color: #1C2B3A;
+    padding: 1rem;
+  }
+  .card {
+    background: white;
+    border-radius: 16px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 12px rgba(27,58,107,0.08);
+  }
+  .header {
+    border-top: 5px solid #E8500A;
+    text-align: center;
+    padding: 2rem 1.5rem 1.5rem;
+  }
+  .header h1 { color: #1B3A6B; font-size: 1.4rem; margin-top: 0.5rem; }
+  .header p  { color: #5A6D82; font-size: 0.9rem; margin-top: 0.3rem; }
+  .logo { font-size: 2.5rem; }
+
+  label.field-label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #5A6D82;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.3rem;
+    margin-top: 1rem;
+  }
+  input[type="text"], input[type="date"], textarea, select {
+    width: 100%;
+    border: 1.5px solid #DDE3EE;
+    border-radius: 8px;
+    padding: 0.6rem 0.8rem;
+    font-size: 0.95rem;
+    color: #1C2B3A;
+    background: white;
+    appearance: none;
+  }
+  input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: #1B3A6B;
+    box-shadow: 0 0 0 3px rgba(27,58,107,0.10);
+  }
+
+  .section-title {
+    font-size: 1rem;
+    font-weight: 800;
+    color: #1B3A6B;
+    margin-bottom: 0.8rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 2px solid #F0F2F6;
+  }
+
+  .check-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #F0F2F6;
+    gap: 1rem;
+  }
+  .check-item:last-child { border-bottom: none; }
+  .check-label { font-size: 0.95rem; font-weight: 500; flex: 1; }
+
+  .radio-group { display: flex; gap: 0.5rem; flex-shrink: 0; }
+  .radio-group label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1.5px solid #DDE3EE;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .radio-group input[type="radio"] { display: none; }
+  .radio-group input[type="radio"]:checked + span { font-weight: 800; }
+
+  .opt-ok input:checked ~ span,
+  .opt-ok:has(input:checked) { background: #E8F8F0; border-color: #1A8C5B; color: #1A8C5B; }
+  .opt-rev:has(input:checked) { background: #FFF8E6; border-color: #D4890A; color: #D4890A; }
+  .opt-def:has(input:checked) { background: #FDECEA; border-color: #C0392B; color: #C0392B; }
+
+  .foto-area {
+    border: 2px dashed #DDE3EE;
+    border-radius: 12px;
+    padding: 1.5rem;
+    text-align: center;
+    color: #5A6D82;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  .foto-area:hover { border-color: #E8500A; }
+  .foto-area input { display: none; }
+  .foto-preview {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.8rem;
+  }
+  .foto-preview img {
+    width: 80px; height: 80px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 2px solid #DDE3EE;
+  }
+
+  .btn-submit {
+    width: 100%;
+    background: #E8500A;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 1rem;
+    font-size: 1.05rem;
+    font-weight: 800;
+    cursor: pointer;
+    margin-top: 0.5rem;
+    transition: opacity 0.2s;
+  }
+  .btn-submit:hover { opacity: 0.88; }
+
+  .success-msg {
+    display: none;
+    background: #E8F8F0;
+    border: 2px solid #1A8C5B;
+    border-radius: 12px;
+    padding: 1.5rem;
+    text-align: center;
+    color: #1A8C5B;
+    font-weight: 700;
+    font-size: 1.1rem;
+    margin-top: 1rem;
+  }
+
+  @media (max-width: 480px) {
+    .check-item { flex-direction: column; align-items: flex-start; }
+    .radio-group { width: 100%; justify-content: space-between; }
+  }
+</style>
+</head>
+<body>
+
+<div class="card header">
+  <div class="logo">🚚</div>
+  <h1>PRODE · Check-in de Vehículo</h1>
+  <p>Completa el estado del vehículo antes de comenzar el servicio</p>
+</div>
+
+<form id="checkinForm">
+
+  <!-- Datos básicos -->
+  <div class="card">
+    <div class="section-title">📋 Datos del servicio</div>
+
+    <label class="field-label">Matrícula del vehículo *</label>
+    <input type="text" name="matricula" placeholder="Ej: C9227BWP" required>
+
+    <label class="field-label">Tu nombre completo *</label>
+    <input type="text" name="conductor" placeholder="Nombre y apellidos" required>
+
+    <label class="field-label">Fecha *</label>
+    <input type="date" name="fecha" required>
+
+    <label class="field-label">Kilometraje actual</label>
+    <input type="text" name="km" placeholder="Ej: 45.230 km">
+  </div>
+
+  <!-- Checklist de estado -->
+  <div class="card">
+    <div class="section-title">✅ Estado del vehículo</div>
+    <p style="font-size:0.82rem;color:#5A6D82;margin-bottom:1rem;">
+      Marca el estado de cada elemento. Si hay defecto, indícalo en observaciones.
+    </p>
+
+    <div class="check-item">
+      <span class="check-label">🚗 Carrocería exterior</span>
+      <div class="radio-group">
+        <label class="opt-ok"><input type="radio" name="carroceria" value="Correcto" required><span>✅ OK</span></label>
+        <label class="opt-rev"><input type="radio" name="carroceria" value="Revisar"><span>⚠️ Revisar</span></label>
+        <label class="opt-def"><input type="radio" name="carroceria" value="Defecto"><span>❌ Defecto</span></label>
+      </div>
+    </div>
+
+    <div class="check-item">
+      <span class="check-label">🔧 Ruedas y neumáticos</span>
+      <div class="radio-group">
+        <label class="opt-ok"><input type="radio" name="ruedas" value="Correcto" required><span>✅ OK</span></label>
+        <label class="opt-rev"><input type="radio" name="ruedas" value="Revisar"><span>⚠️ Revisar</span></label>
+        <label class="opt-def"><input type="radio" name="ruedas" value="Defecto"><span>❌ Defecto</span></label>
+      </div>
+    </div>
+
+    <div class="check-item">
+      <span class="check-label">💡 Luces delanteras y traseras</span>
+      <div class="radio-group">
+        <label class="opt-ok"><input type="radio" name="luces" value="Correcto" required><span>✅ OK</span></label>
+        <label class="opt-rev"><input type="radio" name="luces" value="Revisar"><span>⚠️ Revisar</span></label>
+        <label class="opt-def"><input type="radio" name="luces" value="Defecto"><span>❌ Defecto</span></label>
+      </div>
+    </div>
+
+    <div class="check-item">
+      <span class="check-label">🪟 Cristales y espejos</span>
+      <div class="radio-group">
+        <label class="opt-ok"><input type="radio" name="cristales" value="Correcto" required><span>✅ OK</span></label>
+        <label class="opt-rev"><input type="radio" name="cristales" value="Revisar"><span>⚠️ Revisar</span></label>
+        <label class="opt-def"><input type="radio" name="cristales" value="Defecto"><span>❌ Defecto</span></label>
+      </div>
+    </div>
+
+    <div class="check-item">
+      <span class="check-label">💺 Interior y limpieza</span>
+      <div class="radio-group">
+        <label class="opt-ok"><input type="radio" name="interior" value="Correcto" required><span>✅ OK</span></label>
+        <label class="opt-rev"><input type="radio" name="interior" value="Revisar"><span>⚠️ Revisar</span></label>
+        <label class="opt-def"><input type="radio" name="interior" value="Defecto"><span>❌ Defecto</span></label>
+      </div>
+    </div>
+
+    <div class="check-item">
+      <span class="check-label">🛑 Frenos</span>
+      <div class="radio-group">
+        <label class="opt-ok"><input type="radio" name="frenos" value="Correcto" required><span>✅ OK</span></label>
+        <label class="opt-rev"><input type="radio" name="frenos" value="Revisar"><span>⚠️ Revisar</span></label>
+        <label class="opt-def"><input type="radio" name="frenos" value="Defecto"><span>❌ Defecto</span></label>
+      </div>
+    </div>
+
+    <div class="check-item">
+      <span class="check-label">🛢️ Nivel de aceite</span>
+      <div class="radio-group">
+        <label class="opt-ok"><input type="radio" name="nivel_aceite" value="Correcto" required><span>✅ OK</span></label>
+        <label class="opt-rev"><input type="radio" name="nivel_aceite" value="Revisar"><span>⚠️ Revisar</span></label>
+        <label class="opt-def"><input type="radio" name="nivel_aceite" value="Defecto"><span>❌ Defecto</span></label>
+      </div>
+    </div>
+
+    <div class="check-item">
+      <span class="check-label">📄 Documentación en vehículo</span>
+      <div class="radio-group">
+        <label class="opt-ok"><input type="radio" name="documentacion" value="Correcto" required><span>✅ OK</span></label>
+        <label class="opt-rev"><input type="radio" name="documentacion" value="Revisar"><span>⚠️ Revisar</span></label>
+        <label class="opt-def"><input type="radio" name="documentacion" value="Defecto"><span>❌ Defecto</span></label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Observaciones -->
+  <div class="card">
+    <div class="section-title">💬 Observaciones</div>
+    <textarea name="observaciones" rows="3"
+              placeholder="Describe cualquier incidencia, golpe, o anomalía que hayas observado…"></textarea>
+  </div>
+
+  <!-- Fotos -->
+  <div class="card">
+    <div class="section-title">📸 Fotos del estado</div>
+    <p style="font-size:0.82rem;color:#5A6D82;margin-bottom:0.8rem;">
+      Sube fotos del vehículo: exterior, interior, y cualquier daño visible.
+    </p>
+    <label class="foto-area" for="fotoInput">
+      <div style="font-size:2rem;margin-bottom:0.5rem;">📷</div>
+      <strong>Toca aquí para añadir fotos</strong><br>
+      <span style="font-size:0.8rem;">Puedes seleccionar varias a la vez</span>
+      <input type="file" id="fotoInput" name="fotos" accept="image/*"
+             multiple capture="environment" onchange="previewFotos(this)">
+    </label>
+    <div class="foto-preview" id="fotoPreview"></div>
+  </div>
+
+  <div class="card" style="padding:1rem;">
+    <button type="submit" class="btn-submit">
+      ✅ Enviar check-in
+    </button>
+  </div>
+
+</form>
+
+<div class="success-msg" id="successMsg">
+  ✅ Check-in enviado correctamente.<br>
+  <span style="font-size:0.9rem;font-weight:400;">Gracias. El responsable recibirá la información.</span>
+</div>
+
+<script>
+  // Preview de fotos
+  function previewFotos(input) {
+    const preview = document.getElementById('fotoPreview');
+    preview.innerHTML = '';
+    Array.from(input.files).forEach(file => {
+      const reader = new FileReader();
+      reader.onload = e => {
+        const img = document.createElement('img');
+        img.src = e.target.result;
+        preview.appendChild(img);
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // Rellenar fecha de hoy por defecto
+  document.querySelector('input[name="fecha"]').valueAsDate = new Date();
+
+  // Submit — aquí puedes conectar a tu endpoint o Supabase
+  document.getElementById('checkinForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const data = new FormData(this);
+    const obj  = {};
+    for (let [k,v] of data.entries()) { obj[k] = v; }
+    console.log('Check-in data:', obj);
+
+    // Mostrar confirmación
+    this.style.display = 'none';
+    document.getElementById('successMsg').style.display = 'block';
+
+    // TODO: enviar a tu backend / Supabase Edge Function
+    // fetch('/api/checkin', { method: 'POST', body: JSON.stringify(obj) })
+  });
+</script>
+</body>
+</html>
