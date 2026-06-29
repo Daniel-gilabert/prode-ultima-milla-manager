@@ -1,230 +1,141 @@
-def ficha_vehiculo(veh_id: int):
-    rows = query("SELECT * FROM vehiculos WHERE id = %s", (veh_id,))
-    if not rows:
-        st.error("Vehículo no encontrado.")
-        return
-    v = rows[0]
+"""pages/servicios.py — Lista de servicios y ficha."""
+import streamlit as st
+from utils import query, execute, page_header, back_button, badge
 
-    if back_button("← Volver a vehículos"):
-        st.session_state.pop("selected_vehiculo", None)
+
+def ficha_servicio(srv_id: int):
+    rows = query("SELECT * FROM servicios WHERE id = %s", (srv_id,))
+    if not rows:
+        st.error("Servicio no encontrado.")
+        return
+    s = rows[0]
+
+    if back_button("← Volver a servicios"):
+        st.session_state.pop("selected_servicio", None)
         st.rerun()
 
-    hoy       = datetime.date.today()
-    itv_fecha = v.get("itv_vigente_hasta")
-    seg_fecha = v.get("seguro_vigente_hasta")
-
-    if itv_fecha and itv_fecha <= hoy:
-        st.error(f"⚠️ ITV vencida el {itv_fecha}")
-    elif itv_fecha and (itv_fecha - hoy).days <= 30:
-        st.warning(f"⚠️ ITV vence en {(itv_fecha - hoy).days} días ({itv_fecha})")
-    if seg_fecha and seg_fecha <= hoy:
-        st.error(f"⚠️ Seguro vencido el {seg_fecha}")
-    elif seg_fecha and (seg_fecha - hoy).days <= 30:
-        st.warning(f"⚠️ Seguro vence en {(seg_fecha - hoy).days} días ({seg_fecha})")
-
-    marca      = v.get("marca", "")
-    emoji      = get_emoji(marca)
-    tipo_color = "orange" if str(v.get("tipo","")).lower() == "renting" else "blue"
-
-    col_img, col_info = st.columns([0.18, 0.82])
-    with col_img:
-        st.markdown(f"""
-        <div style="width:80px;height:80px;border-radius:12px;
-                    background:rgba(27,58,107,0.08);
-                    display:flex;align-items:center;justify-content:center;
-                    font-size:2.8rem;">{emoji}</div>
-        """, unsafe_allow_html=True)
-    with col_info:
-        st.markdown(f"""
-        <h2 style="margin:0;color:#1B3A6B;font-weight:800;">
-            {v.get('matricula','—')} &nbsp; {badge(v.get('tipo','—'), tipo_color)}
-        </h2>
-        <p style="color:#5A6D82;margin:4px 0 0;">
-            {marca} {v.get('modelo','—')}
-            &nbsp;|&nbsp; Bastidor: {v.get('bastidor','—')}
-        </p>
-        """, unsafe_allow_html=True)
-
+    activo_b = badge("Activo", "green") if s.get("activo") else badge("Inactivo", "red")
+    st.markdown(f"""
+    <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem;">
+        <span style="font-size:2rem">📋</span>
+        <div>
+            <h2 style="margin:0;color:#1B3A6B;font-weight:800;">
+                {s.get('codigo','—')} — {s.get('descripcion','—')}
+                &nbsp;{activo_b}
+            </h2>
+            <p style="color:#5A6D82;margin:4px 0 0;">
+                {s.get('tipo_servicio','—')} &nbsp;|&nbsp;
+                📅 {s.get('fecha_inicio_contrato','—')} → {s.get('fecha_fin_contrato','—')}
+            </p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     st.markdown("---")
 
-    tab_datos, tab_checkin_t, tab_empleados = st.tabs([
-        "🔧 Datos del vehículo", "📋 Check-in de estado", "👥 Empleados asignados"
+    tab_datos, tab_empresa, tab_emp, tab_veh = st.tabs([
+        "📋 Datos del servicio",
+        "🏢 Empresa / Cliente",
+        "👤 Empleado asignado",
+        "🚛 Vehículo asignado"
     ])
 
     with tab_datos:
-        marcas_disp  = get_marcas()
-        marca_actual = marca if marca in marcas_disp else marcas_disp[0]
         c1, c2 = st.columns(2)
         with c1:
-            matricula   = st.text_input("Matrícula",  value=v.get("matricula",""))
-            bastidor    = st.text_input("Bastidor",   value=v.get("bastidor",""))
-            marca_sel   = st.selectbox("Marca", marcas_disp,
-                                       index=marcas_disp.index(marca_actual)
-                                       if marca_actual in marcas_disp else 0)
-            modelo      = st.text_input("Modelo",     value=v.get("modelo",""))
+            st.text_input("Código",        value=s.get("codigo",""),               disabled=True)
+            st.text_input("Descripción",   value=s.get("descripcion",""),          disabled=True)
+            st.text_input("Tipo servicio", value=s.get("tipo_servicio","") or "",  disabled=True)
+            st.text_input("Días servicio", value=s.get("dias_servicio","") or "",  disabled=True)
         with c2:
-            tipo        = st.selectbox("Tipo", ["renting","propiedad"],
-                                       index=0 if v.get("tipo","renting")=="renting" else 1)
-            itv_v       = st.date_input("ITV vigente hasta", value=itv_fecha or hoy)
-            aseguradora = st.text_input("Aseguradora", value=v.get("aseguradora","") or "")
-            poliza      = st.text_input("Póliza",      value=v.get("poliza","") or "")
-        if st.button("💾 Guardar cambios", key="save_veh"):
-            ok = execute("""
-                UPDATE vehiculos
-                SET matricula=%s, bastidor=%s, marca=%s, modelo=%s,
-                    tipo=%s, itv_vigente_hasta=%s, aseguradora=%s, poliza=%s
-                WHERE id=%s
-            """, (matricula, bastidor, marca_sel, modelo,
-                  tipo, itv_v, aseguradora, poliza, veh_id))
-            if ok:
-                st.success("Vehículo actualizado.")
+            st.text_input("Horario inicio",  value=s.get("horario_inicio","") or "",              disabled=True)
+            st.text_input("Horario fin",     value=s.get("horario_fin","") or "",                 disabled=True)
+            st.text_input("Inicio contrato", value=str(s.get("fecha_inicio_contrato","") or ""),  disabled=True)
+            st.text_input("Fin contrato",    value=str(s.get("fecha_fin_contrato","") or ""),     disabled=True)
+        if s.get("observaciones"):
+            st.markdown("**Observaciones:**")
+            st.info(s["observaciones"])
+        if s.get("tarifa_mensual"):
+            st.markdown(f"**Tarifa mensual:** `{s['tarifa_mensual']} €`")
 
-    with tab_checkin_t:
-        tab_checkin(veh_id, v.get("matricula",""))
+    with tab_empresa:
+        c1, c2 = st.columns(2)
+        with c1:
+            st.text_input("Empresa",   value=s.get("empresa_nombre","") or "",    disabled=True)
+            st.text_input("CIF",       value=s.get("empresa_cif","") or "",       disabled=True)
+            st.text_input("Dirección", value=s.get("empresa_direccion","") or "", disabled=True)
+            st.text_input("CP",        value=s.get("empresa_cp","") or "",        disabled=True)
+            st.text_input("Ciudad",    value=s.get("empresa_ciudad","") or "",    disabled=True)
+        with c2:
+            st.text_input("Contacto",  value=s.get("contacto_nombre","") or "",   disabled=True)
+            st.text_input("Cargo",     value=s.get("contacto_cargo","") or "",    disabled=True)
+            st.text_input("Email",     value=s.get("contacto_email","") or "",    disabled=True)
+            st.text_input("Teléfono",  value=s.get("contacto_telefono","") or "", disabled=True)
+            st.text_input("Móvil",     value=s.get("contacto_movil","") or "",    disabled=True)
 
-    with tab_empleados:
-        emp_rows = query("""
-            SELECT DISTINCT e.id, e.nombre, e.apellidos, e.email
-            FROM servicios s
-            JOIN empleados e ON e.id = s.empleado_base_id
-            WHERE s.vehiculo_base_id = %s
-            ORDER BY e.apellidos
-        """, (veh_id,))
-        if emp_rows:
-            for emp in emp_rows:
-                ini = (emp['nombre'][0] + emp['apellidos'][0]).upper()
+    with tab_emp:
+        emp_id = s.get("empleado_base_id")
+        if emp_id:
+            emp = query("SELECT * FROM empleados WHERE id = %s", (emp_id,))
+            if emp:
+                e = emp[0]
+                ini = (e['nombre'][0] + e['apellidos'][0]).upper()
+                activo_emp = badge("Activo","green") if e.get("activo") else badge("Inactivo","red")
                 st.markdown(f"""
                 <div class="row-card">
                     <div class="row-avatar">{ini}</div>
                     <div>
-                        <div class="row-name">{emp['nombre']} {emp['apellidos']}</div>
-                        <div class="row-sub">📧 {emp.get('email','—')}</div>
+                        <div class="row-name">
+                            {e['nombre']} {e['apellidos']} &nbsp; {activo_emp}
+                        </div>
+                        <div class="row-sub">
+                            📧 {e.get('email','—')} &nbsp;|&nbsp;
+                            📱 {e.get('telefono','—')} &nbsp;|&nbsp;
+                            🪪 {e.get('dni','—')}
+                        </div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
+                if st.button("Ver ficha del empleado →"):
+                    st.session_state["selected_empleado"] = e["id"]
+                    st.session_state["page"] = "Empleados"
+                    st.session_state.pop("selected_servicio", None)
+                    st.rerun()
         else:
-            st.info("Ningún empleado asignado a este vehículo en servicios.")
+            st.info("Sin empleado asignado.")
 
-
-def lista_vehiculos():
-    page_header("🚛", "Vehículos")
-    hoy = datetime.date.today()
-
-    col_s, col_t, col_btn, col_marca = st.columns([2, 1, 1, 1])
-    with col_s:
-        buscar = st.text_input("🔍 Buscar", label_visibility="collapsed",
-                               placeholder="Matrícula, marca, modelo…")
-    with col_t:
-        filtro_tipo = st.selectbox("Tipo", ["Todos","Renting","Propiedad"],
-                                   label_visibility="collapsed")
-    with col_btn:
-        if st.button("➕ Nuevo vehículo", use_container_width=True):
-            st.session_state["nuevo_vehiculo"] = not st.session_state.get("nuevo_vehiculo", False)
-    with col_marca:
-        if st.button("⚙️ Gestionar marcas", use_container_width=True):
-            st.session_state["gestionar_marcas"] = not st.session_state.get("gestionar_marcas", False)
-
-    if st.session_state.get("gestionar_marcas"):
-        with st.expander("⚙️ Marcas disponibles", expanded=True):
-            for m in get_marcas():
-                st.markdown(f"- {get_emoji(m)} {m}")
-            st.markdown("---")
-            nueva_marca = st.text_input("Añadir nueva marca", key="input_nueva_marca")
-            if st.button("Añadir marca", key="btn_add_marca"):
-                if nueva_marca.strip():
-                    extra = st.session_state.get("marcas_extra", [])
-                    if nueva_marca.strip() not in extra and nueva_marca.strip() not in ["Paxter","Scoobic","Renault"]:
-                        extra.append(nueva_marca.strip())
-                        st.session_state["marcas_extra"] = extra
-                        st.success(f"Marca '{nueva_marca}' añadida.")
-                        st.rerun()
-
-    if st.session_state.get("nuevo_vehiculo"):
-        with st.expander("➕ Nuevo vehículo", expanded=True):
-            with st.form("form_nuevo_veh"):
-                c1, c2 = st.columns(2)
-                with c1:
-                    n_mat  = st.text_input("Matrícula *")
-                    n_bast = st.text_input("Bastidor")
-                    n_marc = st.selectbox("Marca *", get_marcas())
-                    n_mod  = st.text_input("Modelo")
-                with c2:
-                    n_tipo = st.selectbox("Tipo", ["renting","propiedad"])
-                    n_itv  = st.date_input("ITV vigente hasta", value=hoy)
-                    n_seg  = st.date_input("Seguro vigente hasta", value=hoy)
-                    n_aseg = st.text_input("Aseguradora")
-                    n_pol  = st.text_input("Póliza")
-                if st.form_submit_button("✅ Crear vehículo", use_container_width=True):
-                    if not n_mat:
-                        st.warning("La matrícula es obligatoria.")
-                    else:
-                        ok = execute("""
-                            INSERT INTO vehiculos
-                            (matricula, bastidor, marca, modelo, tipo,
-                             itv_vigente_hasta, seguro_vigente_hasta, aseguradora, poliza)
-                            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                        """, (n_mat, n_bast, n_marc, n_mod, n_tipo,
-                              n_itv, n_seg, n_aseg, n_pol))
-                        if ok:
-                            st.success(f"Vehículo {n_mat} creado.")
-                            st.session_state["nuevo_vehiculo"] = False
-                            st.rerun()
-
-    where, params = [], []
-    if buscar:
-        where.append("(matricula ILIKE %s OR marca ILIKE %s OR modelo ILIKE %s)")
-        params += [f"%{buscar}%"] * 3
-    if filtro_tipo == "Renting":
-        where.append("tipo = 'renting'")
-    elif filtro_tipo == "Propiedad":
-        where.append("tipo = 'propiedad'")
-
-    sql = "SELECT * FROM vehiculos"
-    if where:
-        sql += " WHERE " + " AND ".join(where)
-    sql += " ORDER BY matricula"
-
-    vehiculos = query(sql, params or None)
-    st.markdown(f"**{len(vehiculos)} vehículo(s)**")
-    st.markdown("---")
-
-    for v in vehiculos:
-        itv_v = v.get("itv_vigente_hasta")
-        marca = v.get("marca","")
-        emoji = get_emoji(marca)
-        alerta = "🔴" if itv_v and itv_v <= hoy else ("🟡" if itv_v and (itv_v - hoy).days <= 30 else "🟢")
-        tipo_b = badge(v.get("tipo","—"), "orange" if v.get("tipo") == "renting" else "blue")
-
-        col_main, col_act = st.columns([5, 0.8])
-        with col_main:
-            st.markdown(f"""
-            <div class="row-card">
-                <div class="row-avatar" style="background:rgba(27,58,107,0.08);
-                     color:#1B3A6B;font-size:1.6rem;width:48px;height:48px;">
-                    {emoji}
-                </div>
-                <div>
-                    <div class="row-name">{v.get('matricula','—')} &nbsp; {tipo_b}</div>
-                    <div class="row-sub">
-                        {marca} {v.get('modelo','—')}
-                        &nbsp;|&nbsp; ITV: {alerta} {itv_v or '—'}
-                        &nbsp;|&nbsp; Bastidor: {v.get('bastidor','—')}
+    with tab_veh:
+        veh_id = s.get("vehiculo_base_id")
+        if veh_id:
+            veh = query("SELECT * FROM vehiculos WHERE id = %s", (veh_id,))
+            if veh:
+                v = veh[0]
+                st.markdown(f"""
+                <div class="row-card">
+                    <div class="row-avatar"
+                         style="background:rgba(27,58,107,0.08);
+                                color:#1B3A6B;font-size:1.4rem;">🚛</div>
+                    <div>
+                        <div class="row-name">
+                            {v.get('matricula','—')} —
+                            {v.get('marca','')} {v.get('modelo','')}
+                        </div>
+                        <div class="row-sub">
+                            Tipo: {v.get('tipo','—')} &nbsp;|&nbsp;
+                            ITV: {v.get('itv_vigente_hasta','—')}
+                        </div>
                     </div>
                 </div>
-            </div>
-            """, unsafe_allow_html=True)
-        with col_act:
-            if st.button("Ver →", key=f"veh_{v['id']}"):
-                st.session_state["selected_vehiculo"] = v["id"]
-                st.rerun()
+                """, unsafe_allow_html=True)
+                if st.button("Ver ficha del vehículo →"):
+                    st.session_state["selected_vehiculo"] = v["id"]
+                    st.session_state["page"] = "Vehiculos"
+                    st.session_state.pop("selected_servicio", None)
+                    st.rerun()
+        else:
+            st.info("Sin vehículo asignado.")
 
 
-def render():
-    if st.session_state.get("selected_vehiculo"):
-        ficha_vehiculo(st.session_state["selected_vehiculo"])
-    else:
-        lista_vehiculos()
-        def lista_servicios():
+def lista_servicios():
     page_header("📋", "Servicios")
 
     col_s, col_f, col_btn = st.columns([2, 1, 1])
