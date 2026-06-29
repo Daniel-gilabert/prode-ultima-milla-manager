@@ -12,21 +12,22 @@ import json
 # Las marcas personalizadas se guardan en st.session_state["marcas_extra"].
 # ─────────────────────────────────────────────
 MARCAS_DEFAULT = {
-    "paxster":  "https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/PNG_transparency_demonstration_1.png/240px-PNG_transparency_demonstration_1.png",
+    "paxter":  "https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/PNG_transparency_demonstration_1.png/240px-PNG_transparency_demonstration_1.png",
     "scoobic": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/PNG_transparency_demonstration_1.png/240px-PNG_transparency_demonstration_1.png",
     "renault": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/PNG_transparency_demonstration_1.png/240px-PNG_transparency_demonstration_1.png",
 }
 
 # Emojis representativos por marca mientras no haya foto real
 MARCA_EMOJI = {
-    "paxster":  "🛵",
+    "paxter":  "🛵",
     "scoobic": "🛺",
     "renault": "🚐",
 }
 
 SUPABASE_URL = "https://drjnffoyzuploatfcltf.supabase.co"
 MARCA_FOTOS = {
-    "paxster":  f"{SUPABASE_URL}/storage/v1/object/public/fotos-app/marcas/paxtser.jpg",
+    "paxster": f"{SUPABASE_URL}/storage/v1/object/public/fotos-app/marcas/paxster.jpg",
+    "paxter":  f"{SUPABASE_URL}/storage/v1/object/public/fotos-app/marcas/paxster.jpg",
     "scoobic": f"{SUPABASE_URL}/storage/v1/object/public/fotos-app/marcas/scoobic.jpg",
     "renault": f"{SUPABASE_URL}/storage/v1/object/public/fotos-app/marcas/renault.jpg",
 }
